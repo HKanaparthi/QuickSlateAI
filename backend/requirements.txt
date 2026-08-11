@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pydantic>=2.7
+pydantic-settings
+ortools>=9.12
+anthropic
+sqlalchemy
+alembic
+python-dotenv
+httpx
+python-multipart
