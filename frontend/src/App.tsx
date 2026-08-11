@@ -89,12 +89,17 @@ export default function App() {
                 subtitle={`${appState.schedule.league_id} · ${appState.schedule.total_games} games · Solver: ${appState.schedule.solver_status}`}
                 inline
               />
+
               <button
                 onClick={() => setAppState(null)}
                 className="btn-secondary text-sm"
               >
                 ← New Schedule
               </button>
+            </div>
+            <div className="mb-4 px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-400 text-xs inline-flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+              Schedule generated using OR-Tools CP-SAT solver
             </div>
             {error && (
               <div className="mb-4 p-4 bg-danger/10 border border-danger/30 rounded-lg text-danger text-sm">

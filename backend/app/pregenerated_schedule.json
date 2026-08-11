@@ -1,0 +1,902 @@
+{
+  "schedule": {
+    "id": "46b60fd9-0654-49e3-b1d4-bf8f1873b4cf",
+    "league_id": "NPL",
+    "season_start": "2026-10-01",
+    "season_end": "2027-04-30",
+    "games": [
+      {
+        "id": "e1183ad4-8101-4eb1-9603-be4585f2e0a2",
+        "home_team_id": "asheville_storms",
+        "away_team_id": "greensboro_wolves",
+        "venue_id": "storm_pavilion",
+        "game_date": "2026-10-02",
+        "timeslot": "Friday 7:00 PM",
+        "is_rivalry": true,
+        "ai_explanation": null,
+        "projected_viewership": 22422
+      },
+      {
+        "id": "64d16181-bc44-4d3c-bd5f-3564467c25d8",
+        "home_team_id": "charlotte_thunder",
+        "away_team_id": "wilmington_tide",
+        "venue_id": "thunder_dome",
+        "game_date": "2026-10-03",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 37357
+      },
+      {
+        "id": "b6b26774-047c-4c63-a0cc-af24db995485",
+        "home_team_id": "fayetteville_falcons",
+        "away_team_id": "cary_cobras",
+        "venue_id": "falcon_field",
+        "game_date": "2026-10-03",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 19050
+      },
+      {
+        "id": "386a150f-42d1-4dc2-9fc5-afa8106e513a",
+        "home_team_id": "raleigh_hawks",
+        "away_team_id": "asheville_storms",
+        "venue_id": "hawk_center",
+        "game_date": "2026-10-04",
+        "timeslot": "Sunday 4:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 25770
+      },
+      {
+        "id": "2e3e9c9b-82bc-4dbd-b548-8834afde4105",
+        "home_team_id": "greensboro_wolves",
+        "away_team_id": "cary_cobras",
+        "venue_id": "wolf_den_arena",
+        "game_date": "2026-10-16",
+        "timeslot": "Friday 7:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 14699
+      },
+      {
+        "id": "1e7d2e02-e33d-4f36-b76d-57f8652c3178",
+        "home_team_id": "durham_blaze",
+        "away_team_id": "asheville_storms",
+        "venue_id": "blaze_stadium",
+        "game_date": "2026-10-17",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 21868
+      },
+      {
+        "id": "6979a571-2ed7-4b8e-b46c-8989bc12d50e",
+        "home_team_id": "wilmington_tide",
+        "away_team_id": "raleigh_hawks",
+        "venue_id": "tidal_wave_center",
+        "game_date": "2026-10-17",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 15638
+      },
+      {
+        "id": "7189f14c-290b-4205-9f71-464469738e2f",
+        "home_team_id": "greensboro_wolves",
+        "away_team_id": "charlotte_thunder",
+        "venue_id": "wolf_den_arena",
+        "game_date": "2026-10-18",
+        "timeslot": "Sunday 4:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 18863
+      },
+      {
+        "id": "d6a65638-45f6-4172-8574-39f7f5791149",
+        "home_team_id": "raleigh_hawks",
+        "away_team_id": "wilmington_tide",
+        "venue_id": "hawk_center",
+        "game_date": "2026-10-30",
+        "timeslot": "Friday 7:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 21739
+      },
+      {
+        "id": "4aac9c09-d3b5-4444-b9a4-256fb3b6c91a",
+        "home_team_id": "durham_blaze",
+        "away_team_id": "fayetteville_falcons",
+        "venue_id": "blaze_stadium",
+        "game_date": "2026-10-31",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 24064
+      },
+      {
+        "id": "e8987c13-0c86-43e7-99ac-af3ad748b6b9",
+        "home_team_id": "asheville_storms",
+        "away_team_id": "cary_cobras",
+        "venue_id": "storm_pavilion",
+        "game_date": "2026-10-31",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 13029
+      },
+      {
+        "id": "847c39ba-ad88-4870-b1fa-4a650bb446d1",
+        "home_team_id": "wilmington_tide",
+        "away_team_id": "greensboro_wolves",
+        "venue_id": "tidal_wave_center",
+        "game_date": "2026-11-01",
+        "timeslot": "Sunday 4:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 14682
+      },
+      {
+        "id": "72b98c0b-3c17-4443-8499-f3eae3717b9a",
+        "home_team_id": "fayetteville_falcons",
+        "away_team_id": "raleigh_hawks",
+        "venue_id": "falcon_field",
+        "game_date": "2026-11-20",
+        "timeslot": "Friday 7:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 15174
+      },
+      {
+        "id": "80e769c7-c86c-4d7c-b614-d0086a03f36d",
+        "home_team_id": "cary_cobras",
+        "away_team_id": "wilmington_tide",
+        "venue_id": "northside_arena",
+        "game_date": "2026-11-21",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 21717
+      },
+      {
+        "id": "45f96880-c8ca-4dd6-a947-b9c5dbf1cfe9",
+        "home_team_id": "durham_blaze",
+        "away_team_id": "greensboro_wolves",
+        "venue_id": "blaze_stadium",
+        "game_date": "2026-11-21",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 23912
+      },
+      {
+        "id": "f0df9ea8-2214-440c-bc03-9556f4b31f3f",
+        "home_team_id": "asheville_storms",
+        "away_team_id": "charlotte_thunder",
+        "venue_id": "storm_pavilion",
+        "game_date": "2026-11-22",
+        "timeslot": "Sunday 4:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 13582
+      },
+      {
+        "id": "76cdc3d8-deab-4552-a32d-564448b67578",
+        "home_team_id": "asheville_storms",
+        "away_team_id": "raleigh_hawks",
+        "venue_id": "storm_pavilion",
+        "game_date": "2026-12-04",
+        "timeslot": "Friday 7:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 10333
+      },
+      {
+        "id": "0b2a629f-cd5d-413d-9ebd-d630a6095fb7",
+        "home_team_id": "durham_blaze",
+        "away_team_id": "cary_cobras",
+        "venue_id": "blaze_stadium",
+        "game_date": "2026-12-05",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 23848
+      },
+      {
+        "id": "4ca21cc7-75bb-477d-a60e-343937f9efcc",
+        "home_team_id": "greensboro_wolves",
+        "away_team_id": "wilmington_tide",
+        "venue_id": "wolf_den_arena",
+        "game_date": "2026-12-05",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 19262
+      },
+      {
+        "id": "6d4c54b5-b348-4f9e-8129-d63da93a329c",
+        "home_team_id": "charlotte_thunder",
+        "away_team_id": "fayetteville_falcons",
+        "venue_id": "thunder_dome",
+        "game_date": "2026-12-06",
+        "timeslot": "Sunday 4:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 26596
+      },
+      {
+        "id": "048f9840-61bd-4f9f-b293-357b1a5a977b",
+        "home_team_id": "fayetteville_falcons",
+        "away_team_id": "durham_blaze",
+        "venue_id": "falcon_field",
+        "game_date": "2026-12-18",
+        "timeslot": "Friday 7:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 14406
+      },
+      {
+        "id": "07c285a3-c2ef-4861-919a-ae3659d0c5d7",
+        "home_team_id": "raleigh_hawks",
+        "away_team_id": "cary_cobras",
+        "venue_id": "hawk_center",
+        "game_date": "2026-12-19",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 23377
+      },
+      {
+        "id": "6118b2b9-6561-4546-bb53-ea3d1f5e6d9c",
+        "home_team_id": "greensboro_wolves",
+        "away_team_id": "asheville_storms",
+        "venue_id": "wolf_den_arena",
+        "game_date": "2026-12-19",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": true,
+        "ai_explanation": null,
+        "projected_viewership": 29271
+      },
+      {
+        "id": "e50bb4b6-3cc6-4e44-87f4-c07014d87d44",
+        "home_team_id": "wilmington_tide",
+        "away_team_id": "charlotte_thunder",
+        "venue_id": "tidal_wave_center",
+        "game_date": "2026-12-20",
+        "timeslot": "Sunday 4:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 13269
+      },
+      {
+        "id": "ee629e35-59e8-4019-b7e9-37f243f37bc1",
+        "home_team_id": "raleigh_hawks",
+        "away_team_id": "durham_blaze",
+        "venue_id": "hawk_center",
+        "game_date": "2027-01-01",
+        "timeslot": "Friday 7:00 PM",
+        "is_rivalry": true,
+        "ai_explanation": null,
+        "projected_viewership": 34781
+      },
+      {
+        "id": "7d3bc199-2024-45de-ad3e-a4721704865f",
+        "home_team_id": "wilmington_tide",
+        "away_team_id": "cary_cobras",
+        "venue_id": "tidal_wave_center",
+        "game_date": "2027-01-02",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 15776
+      },
+      {
+        "id": "a33bebcf-6417-49cf-9083-da96f6f3ee4a",
+        "home_team_id": "fayetteville_falcons",
+        "away_team_id": "charlotte_thunder",
+        "venue_id": "falcon_field",
+        "game_date": "2027-01-02",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 15732
+      },
+      {
+        "id": "cf389ef5-5691-4684-a6e9-b74d47391f2e",
+        "home_team_id": "greensboro_wolves",
+        "away_team_id": "durham_blaze",
+        "venue_id": "wolf_den_arena",
+        "game_date": "2027-01-03",
+        "timeslot": "Sunday 4:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 19922
+      },
+      {
+        "id": "c4136577-8ff6-4da3-ad47-c01ff9d81f2b",
+        "home_team_id": "charlotte_thunder",
+        "away_team_id": "cary_cobras",
+        "venue_id": "thunder_dome",
+        "game_date": "2027-01-15",
+        "timeslot": "Friday 7:00 PM",
+        "is_rivalry": true,
+        "ai_explanation": null,
+        "projected_viewership": 43944
+      },
+      {
+        "id": "fcd60c5d-9f4a-46e1-906f-d04544a5b14f",
+        "home_team_id": "asheville_storms",
+        "away_team_id": "fayetteville_falcons",
+        "venue_id": "storm_pavilion",
+        "game_date": "2027-01-16",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 12676
+      },
+      {
+        "id": "9ebb831f-c260-4d32-9a9d-5c9bec6dd78c",
+        "home_team_id": "wilmington_tide",
+        "away_team_id": "durham_blaze",
+        "venue_id": "tidal_wave_center",
+        "game_date": "2027-01-16",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 12837
+      },
+      {
+        "id": "7a793757-5a15-4309-bfc7-f745ff4696a9",
+        "home_team_id": "cary_cobras",
+        "away_team_id": "raleigh_hawks",
+        "venue_id": "northside_arena",
+        "game_date": "2027-01-17",
+        "timeslot": "Sunday 4:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 19907
+      },
+      {
+        "id": "f5159da6-7380-475c-ace3-a9e25e0749c0",
+        "home_team_id": "wilmington_tide",
+        "away_team_id": "asheville_storms",
+        "venue_id": "tidal_wave_center",
+        "game_date": "2027-01-29",
+        "timeslot": "Friday 7:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 9923
+      },
+      {
+        "id": "4ab0acd6-8e40-4880-b196-e6c78d941738",
+        "home_team_id": "cary_cobras",
+        "away_team_id": "greensboro_wolves",
+        "venue_id": "northside_arena",
+        "game_date": "2027-01-30",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 24248
+      },
+      {
+        "id": "ba901057-0ff8-4b9b-a627-487b6311887c",
+        "home_team_id": "charlotte_thunder",
+        "away_team_id": "raleigh_hawks",
+        "venue_id": "thunder_dome",
+        "game_date": "2027-01-30",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 28913
+      },
+      {
+        "id": "fd9db7a5-30e2-4cee-8e2e-070716de03d1",
+        "home_team_id": "durham_blaze",
+        "away_team_id": "wilmington_tide",
+        "venue_id": "blaze_stadium",
+        "game_date": "2027-01-31",
+        "timeslot": "Sunday 4:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 22463
+      },
+      {
+        "id": "cb34c480-9bb7-4cb7-a5c7-c37f23955810",
+        "home_team_id": "durham_blaze",
+        "away_team_id": "charlotte_thunder",
+        "venue_id": "blaze_stadium",
+        "game_date": "2027-02-12",
+        "timeslot": "Friday 7:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 18157
+      },
+      {
+        "id": "40f7aea3-67cb-47b2-8851-da17991a3b23",
+        "home_team_id": "raleigh_hawks",
+        "away_team_id": "fayetteville_falcons",
+        "venue_id": "hawk_center",
+        "game_date": "2027-02-13",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 26316
+      },
+      {
+        "id": "d930d1b5-015c-4d20-a718-ba861671a861",
+        "home_team_id": "asheville_storms",
+        "away_team_id": "wilmington_tide",
+        "venue_id": "storm_pavilion",
+        "game_date": "2027-02-13",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 12607
+      },
+      {
+        "id": "77399909-715b-4297-8140-38ef52f31d72",
+        "home_team_id": "charlotte_thunder",
+        "away_team_id": "durham_blaze",
+        "venue_id": "thunder_dome",
+        "game_date": "2027-02-14",
+        "timeslot": "Sunday 4:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 26601
+      },
+      {
+        "id": "6a8a0592-c40a-431c-a990-1aaa8f36d9ac",
+        "home_team_id": "charlotte_thunder",
+        "away_team_id": "asheville_storms",
+        "venue_id": "thunder_dome",
+        "game_date": "2027-02-26",
+        "timeslot": "Friday 7:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 23135
+      },
+      {
+        "id": "d951330d-20dd-4799-97d9-08314658aa57",
+        "home_team_id": "cary_cobras",
+        "away_team_id": "durham_blaze",
+        "venue_id": "northside_arena",
+        "game_date": "2027-02-27",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 25189
+      },
+      {
+        "id": "5e13345c-5a71-4830-b0fd-aeb5f90194f3",
+        "home_team_id": "greensboro_wolves",
+        "away_team_id": "raleigh_hawks",
+        "venue_id": "wolf_den_arena",
+        "game_date": "2027-02-27",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 17027
+      },
+      {
+        "id": "da19ca19-e6dd-4bf7-a75b-fec8c1f245c7",
+        "home_team_id": "fayetteville_falcons",
+        "away_team_id": "asheville_storms",
+        "venue_id": "falcon_field",
+        "game_date": "2027-02-28",
+        "timeslot": "Sunday 4:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 17199
+      },
+      {
+        "id": "fe9e4adf-cbfc-4e74-b345-c5cd24595052",
+        "home_team_id": "cary_cobras",
+        "away_team_id": "fayetteville_falcons",
+        "venue_id": "northside_arena",
+        "game_date": "2027-03-12",
+        "timeslot": "Friday 7:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 19694
+      },
+      {
+        "id": "15260eef-e58e-45c9-a9e9-538e9cf5b377",
+        "home_team_id": "charlotte_thunder",
+        "away_team_id": "greensboro_wolves",
+        "venue_id": "thunder_dome",
+        "game_date": "2027-03-13",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 28521
+      },
+      {
+        "id": "b9aaea11-88e2-488f-9d0a-d569e5d4992a",
+        "home_team_id": "asheville_storms",
+        "away_team_id": "durham_blaze",
+        "venue_id": "storm_pavilion",
+        "game_date": "2027-03-13",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 16725
+      },
+      {
+        "id": "76f3558b-ea56-432c-ad59-cbb2fd7058a5",
+        "home_team_id": "wilmington_tide",
+        "away_team_id": "fayetteville_falcons",
+        "venue_id": "tidal_wave_center",
+        "game_date": "2027-03-14",
+        "timeslot": "Sunday 4:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 11638
+      },
+      {
+        "id": "18eb470e-f51b-44c8-9bdb-03982c2d3ec6",
+        "home_team_id": "raleigh_hawks",
+        "away_team_id": "greensboro_wolves",
+        "venue_id": "hawk_center",
+        "game_date": "2027-04-02",
+        "timeslot": "Friday 7:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 18564
+      },
+      {
+        "id": "d3ef6828-cd4b-4158-ac17-dbee15a50413",
+        "home_team_id": "cary_cobras",
+        "away_team_id": "asheville_storms",
+        "venue_id": "northside_arena",
+        "game_date": "2027-04-03",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 22275
+      },
+      {
+        "id": "7779bf77-bca3-4d08-a212-bfaae80dd2dc",
+        "home_team_id": "fayetteville_falcons",
+        "away_team_id": "wilmington_tide",
+        "venue_id": "falcon_field",
+        "game_date": "2027-04-03",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 17781
+      },
+      {
+        "id": "b45696c1-aa8e-45f7-ac0e-1047322eda5b",
+        "home_team_id": "raleigh_hawks",
+        "away_team_id": "charlotte_thunder",
+        "venue_id": "hawk_center",
+        "game_date": "2027-04-04",
+        "timeslot": "Sunday 4:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 19227
+      },
+      {
+        "id": "436b0ccb-e0f7-42d8-b908-132edc4b57b8",
+        "home_team_id": "greensboro_wolves",
+        "away_team_id": "fayetteville_falcons",
+        "venue_id": "wolf_den_arena",
+        "game_date": "2027-04-23",
+        "timeslot": "Friday 7:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 17529
+      },
+      {
+        "id": "890a4c28-8280-4c9e-8098-24f278bb7afd",
+        "home_team_id": "cary_cobras",
+        "away_team_id": "charlotte_thunder",
+        "venue_id": "northside_arena",
+        "game_date": "2027-04-24",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": true,
+        "ai_explanation": null,
+        "projected_viewership": 49850
+      },
+      {
+        "id": "4e456c6d-6c49-4208-978a-71bd95e43563",
+        "home_team_id": "durham_blaze",
+        "away_team_id": "raleigh_hawks",
+        "venue_id": "blaze_stadium",
+        "game_date": "2027-04-24",
+        "timeslot": "Saturday 8:00 PM",
+        "is_rivalry": true,
+        "ai_explanation": null,
+        "projected_viewership": 45612
+      },
+      {
+        "id": "84ce6799-10e6-4767-b533-9c7c61dd9fb5",
+        "home_team_id": "fayetteville_falcons",
+        "away_team_id": "greensboro_wolves",
+        "venue_id": "falcon_field",
+        "game_date": "2027-04-25",
+        "timeslot": "Sunday 4:00 PM",
+        "is_rivalry": false,
+        "ai_explanation": null,
+        "projected_viewership": 17987
+      }
+    ],
+    "constraints": {
+      "league_id": "NPL",
+      "season_start": "2026-10-01",
+      "season_end": "2027-04-30",
+      "min_rest_days": 2,
+      "max_travel_miles_per_week": 600,
+      "primetime_slots": [
+        "Saturday 8:00 PM",
+        "Sunday 4:00 PM",
+        "Friday 7:00 PM"
+      ],
+      "rivalry_pairs": [
+        [
+          "cary_cobras",
+          "charlotte_thunder"
+        ],
+        [
+          "raleigh_hawks",
+          "durham_blaze"
+        ],
+        [
+          "greensboro_wolves",
+          "asheville_storms"
+        ]
+      ],
+      "home_away_balanced": true,
+      "no_back_to_back_away": true,
+      "weather_constraint": false,
+      "max_games_per_slot_per_week": 2,
+      "min_distinct_slots_per_week": 3,
+      "even_distribution": true,
+      "target_games_per_week": 4,
+      "games_per_week_tolerance": 1
+    },
+    "total_games": 56,
+    "generated_at": "2026-08-11",
+    "solver_status": "FEASIBLE"
+  },
+  "validation": {
+    "violations": [
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "cary_cobras",
+        "game1_id": "b6b26774-047c-4c63-a0cc-af24db995485",
+        "game2_id": "2e3e9c9b-82bc-4dbd-b548-8834afde4105",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "cary_cobras",
+        "game1_id": "2e3e9c9b-82bc-4dbd-b548-8834afde4105",
+        "game2_id": "e8987c13-0c86-43e7-99ac-af3ad748b6b9",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "cary_cobras",
+        "game1_id": "0b2a629f-cd5d-413d-9ebd-d630a6095fb7",
+        "game2_id": "07c285a3-c2ef-4861-919a-ae3659d0c5d7",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "cary_cobras",
+        "game1_id": "07c285a3-c2ef-4861-919a-ae3659d0c5d7",
+        "game2_id": "7d3bc199-2024-45de-ad3e-a4721704865f",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "cary_cobras",
+        "game1_id": "7d3bc199-2024-45de-ad3e-a4721704865f",
+        "game2_id": "c4136577-8ff6-4da3-ad47-c01ff9d81f2b",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "charlotte_thunder",
+        "game1_id": "7189f14c-290b-4205-9f71-464469738e2f",
+        "game2_id": "f0df9ea8-2214-440c-bc03-9556f4b31f3f",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "charlotte_thunder",
+        "game1_id": "e50bb4b6-3cc6-4e44-87f4-c07014d87d44",
+        "game2_id": "a33bebcf-6417-49cf-9083-da96f6f3ee4a",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "charlotte_thunder",
+        "game1_id": "b45696c1-aa8e-45f7-ac0e-1047322eda5b",
+        "game2_id": "890a4c28-8280-4c9e-8098-24f278bb7afd",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "raleigh_hawks",
+        "game1_id": "72b98c0b-3c17-4443-8499-f3eae3717b9a",
+        "game2_id": "76cdc3d8-deab-4552-a32d-564448b67578",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "raleigh_hawks",
+        "game1_id": "7a793757-5a15-4309-bfc7-f745ff4696a9",
+        "game2_id": "ba901057-0ff8-4b9b-a627-487b6311887c",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "durham_blaze",
+        "game1_id": "048f9840-61bd-4f9f-b293-357b1a5a977b",
+        "game2_id": "ee629e35-59e8-4019-b7e9-37f243f37bc1",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "durham_blaze",
+        "game1_id": "ee629e35-59e8-4019-b7e9-37f243f37bc1",
+        "game2_id": "cf389ef5-5691-4684-a6e9-b74d47391f2e",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "durham_blaze",
+        "game1_id": "cf389ef5-5691-4684-a6e9-b74d47391f2e",
+        "game2_id": "9ebb831f-c260-4d32-9a9d-5c9bec6dd78c",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "durham_blaze",
+        "game1_id": "77399909-715b-4297-8140-38ef52f31d72",
+        "game2_id": "d951330d-20dd-4799-97d9-08314658aa57",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "durham_blaze",
+        "game1_id": "d951330d-20dd-4799-97d9-08314658aa57",
+        "game2_id": "b9aaea11-88e2-488f-9d0a-d569e5d4992a",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "asheville_storms",
+        "game1_id": "386a150f-42d1-4dc2-9fc5-afa8106e513a",
+        "game2_id": "1e7d2e02-e33d-4f36-b76d-57f8652c3178",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "asheville_storms",
+        "game1_id": "6a8a0592-c40a-431c-a990-1aaa8f36d9ac",
+        "game2_id": "da19ca19-e6dd-4bf7-a75b-fec8c1f245c7",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "greensboro_wolves",
+        "game1_id": "847c39ba-ad88-4870-b1fa-4a650bb446d1",
+        "game2_id": "45f96880-c8ca-4dd6-a947-b9c5dbf1cfe9",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "greensboro_wolves",
+        "game1_id": "15260eef-e58e-45c9-a9e9-538e9cf5b377",
+        "game2_id": "18eb470e-f51b-44c8-9bdb-03982c2d3ec6",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "wilmington_tide",
+        "game1_id": "80e769c7-c86c-4d7c-b614-d0086a03f36d",
+        "game2_id": "4ca21cc7-75bb-477d-a60e-343937f9efcc",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "wilmington_tide",
+        "game1_id": "fd9db7a5-30e2-4cee-8e2e-070716de03d1",
+        "game2_id": "d930d1b5-015c-4d20-a718-ba861671a861",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "fayetteville_falcons",
+        "game1_id": "fcd60c5d-9f4a-46e1-906f-d04544a5b14f",
+        "game2_id": "40f7aea3-67cb-47b2-8851-da17991a3b23",
+        "message": "Back-to-back away games"
+      },
+      {
+        "type": "back_to_back_away",
+        "severity": "YELLOW",
+        "team_id": "fayetteville_falcons",
+        "game1_id": "fe9e4adf-cbfc-4e74-b345-c5cd24595052",
+        "game2_id": "76f3558b-ea56-432c-ad59-cbb2fd7058a5",
+        "message": "Back-to-back away games"
+      }
+    ],
+    "red_count": 0,
+    "yellow_count": 23,
+    "status": "YELLOW"
+  },
+  "summary": {
+    "total_games": 56,
+    "games_per_team": {
+      "cary_cobras": {
+        "home": 7,
+        "away": 7,
+        "total": 14
+      },
+      "charlotte_thunder": {
+        "home": 7,
+        "away": 7,
+        "total": 14
+      },
+      "raleigh_hawks": {
+        "home": 7,
+        "away": 7,
+        "total": 14
+      },
+      "durham_blaze": {
+        "home": 7,
+        "away": 7,
+        "total": 14
+      },
+      "asheville_storms": {
+        "home": 7,
+        "away": 7,
+        "total": 14
+      },
+      "greensboro_wolves": {
+        "home": 7,
+        "away": 7,
+        "total": 14
+      },
+      "wilmington_tide": {
+        "home": 7,
+        "away": 7,
+        "total": 14
+      },
+      "fayetteville_falcons": {
+        "home": 7,
+        "away": 7,
+        "total": 14
+      }
+    },
+    "rivalry_games": 6,
+    "primetime_games": 56,
+    "solver_status": "FEASIBLE"
+  }
+}
