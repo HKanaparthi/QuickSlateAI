@@ -61,6 +61,17 @@ export default function App() {
     }
 
     if (activeSection === 'schedule' && !appState) {
+      if (isGenerating) {
+        return (
+          <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+            <div className="w-14 h-14 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+            <div className="text-center">
+              <p className="text-white text-lg font-semibold">Optimizing schedule...</p>
+              <p className="text-dark-500 text-sm mt-1">OR-Tools CP-SAT solver running — up to 30 seconds</p>
+            </div>
+          </div>
+        );
+      }
       return (
         <div>
           <PageHeader
@@ -96,10 +107,6 @@ export default function App() {
               >
                 ← New Schedule
               </button>
-            </div>
-            <div className="mb-4 px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-400 text-xs inline-flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
-              Schedule generated using OR-Tools CP-SAT solver
             </div>
             {error && (
               <div className="mb-4 p-4 bg-danger/10 border border-danger/30 rounded-lg text-danger text-sm">

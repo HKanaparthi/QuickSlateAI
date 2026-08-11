@@ -1,7 +1,5 @@
 import uuid
-import json
 from datetime import datetime
-from pathlib import Path
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import List, Dict, Optional
@@ -17,16 +15,6 @@ router = APIRouter(prefix="/api/schedule", tags=["schedule"])
 
 _schedule_store: Dict[str, Schedule] = {}
 _explanation_store: Dict[str, Dict[str, str]] = {}
-
-_PREGENERATED_PATH = Path(__file__).parent.parent / "pregenerated_schedule.json"
-_pregenerated: dict | None = None
-
-def _load_pregenerated() -> dict | None:
-    global _pregenerated
-    if _pregenerated is None and _PREGENERATED_PATH.exists():
-        with open(_PREGENERATED_PATH) as f:
-            _pregenerated = json.load(f)
-    return _pregenerated
 
 
 class GenerateRequest(BaseModel):
@@ -98,20 +86,6 @@ def generate_schedule(req: GenerateRequest):
     league = LEAGUES_BY_ID.get(req.league_id)
     if not league:
         raise HTTPException(status_code=404, detail=f"League '{req.league_id}' not found")
-
-    pregenerated = _load_pregenerated()
-    if pregenerated and req.league_id == "NPL":
-        # Serve pre-generated OR-Tools result — avoids timeout on free hosting tiers.
-        # Re-stamp with a fresh ID so the in-memory store works normally.
-        import copy
-        data = copy.deepcopy(pregenerated)
-        new_id = str(uuid.uuid4())
-        data["schedule"]["id"] = new_id
-        data["schedule"]["solver_status"] = "FEASIBLE (pre-generated with OR-Tools CP-SAT)"
-
-        schedule = Schedule(**data["schedule"])
-        _schedule_store[new_id] = schedule
-        return data
 
     rivalry_pairs = req.rivalry_pairs
     if req.use_default_rivalries and not rivalry_pairs:

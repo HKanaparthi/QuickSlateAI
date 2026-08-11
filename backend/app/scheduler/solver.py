@@ -76,13 +76,6 @@ def solve_schedule(
     n_matchups = len(matchups)
     n_slots = len(date_slots)
 
-    # CP-SAT model — cap problem size for responsiveness
-    MAX_SLOTS = 300
-    if n_slots > MAX_SLOTS:
-        step = n_slots // MAX_SLOTS
-        date_slots = date_slots[::step][:MAX_SLOTS]
-        n_slots = len(date_slots)
-
     model = cp_model.CpModel()
 
     # x[m][s] = 1 if matchup m is assigned to slot s
@@ -233,8 +226,8 @@ def solve_schedule(
     model.Maximize(sum(objective_terms))
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 60.0
-    solver.parameters.num_search_workers = 8
+    solver.parameters.max_time_in_seconds = 30.0
+    solver.parameters.num_search_workers = 4
     status = solver.Solve(model)
 
     games: List[Game] = []
