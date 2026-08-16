@@ -208,51 +208,41 @@ def solve_schedule(
 
     # ─────────────────────────────────────────────────────────────────────────
 
-    # ── No back-to-back away games ─────────────────────────────────────────────
-    # Forward-pass "last-was-away" chain: O(teams × slots) vs O(teams × slots²).
-    # lwa[s] = 1 means the most recent game this team played before slot s was away.
-    # Constraint: can't play away at slot s when lwa[s] = 1.
+    # ── No back-to-back away games ────────────────────────────────────────────
     if constraints.no_back_to_back_away:
-        home_at: Dict[Tuple[str, int], List] = {}
-        away_at: Dict[Tuple[str, int], List] = {}
+        away_s: Dict[Tuple[str, int], List] = {}
+        any_s: Dict[Tuple[str, int], List] = {}
         for m, (h, a) in enumerate(matchups):
             for s in range(n_slots):
-                home_at.setdefault((h, s), []).append(x[m][s])
-                away_at.setdefault((a, s), []).append(x[m][s])
+                any_s.setdefault((h, s), []).append(x[m][s])
+                any_s.setdefault((a, s), []).append(x[m][s])
+                away_s.setdefault((a, s), []).append(x[m][s])
 
+        ta: Dict[Tuple[str, int], object] = {}
+        for (tid, s), vlist in any_s.items():
+            b = model.NewBoolVar(f"ta_{tid[:4]}_{s}")
+            model.Add(sum(vlist) >= 1).OnlyEnforceIf(b)
+            model.Add(sum(vlist) == 0).OnlyEnforceIf(b.Not())
+            ta[(tid, s)] = b
+
+        MAX_AWAY_GAP_DAYS = 70
         for team_id in team_ids:
-            lwa = [model.NewBoolVar(f"lwa_{team_id[:4]}_{s}") for s in range(n_slots + 1)]
-            model.Add(lwa[0] == 0)
-
-            for s in range(n_slots):
-                h_vars = home_at.get((team_id, s), [])
-                a_vars = away_at.get((team_id, s), [])
-
-                if not h_vars and not a_vars:
-                    model.Add(lwa[s + 1] == lwa[s])
-                    continue
-
-                indicators = []
-
-                if h_vars:
-                    ph = model.NewBoolVar(f"ph_{team_id[:4]}_{s}")
-                    model.Add(sum(h_vars) >= 1).OnlyEnforceIf(ph)
-                    model.Add(sum(h_vars) == 0).OnlyEnforceIf(ph.Not())
-                    indicators.append(ph)
-                    model.Add(lwa[s + 1] == 0).OnlyEnforceIf(ph)
-
-                if a_vars:
-                    pa = model.NewBoolVar(f"pa_{team_id[:4]}_{s}")
-                    model.Add(sum(a_vars) >= 1).OnlyEnforceIf(pa)
-                    model.Add(sum(a_vars) == 0).OnlyEnforceIf(pa.Not())
-                    indicators.append(pa)
-                    model.Add(pa + lwa[s] <= 1)  # core constraint
-                    model.Add(lwa[s + 1] == 1).OnlyEnforceIf(pa)
-
-                no_game = model.NewBoolVar(f"ng_{team_id[:4]}_{s}")
-                model.Add(sum(indicators) == 0).OnlyEnforceIf(no_game)
-                model.Add(sum(indicators) >= 1).OnlyEnforceIf(no_game.Not())
-                model.Add(lwa[s + 1] == lwa[s]).OnlyEnforceIf(no_game)
+            a_slots = sorted(s for s in range(n_slots) if away_s.get((team_id, s)))
+            for i, s1 in enumerate(a_slots):
+                d1 = date_slots[s1][0]
+                for s2 in a_slots[i + 1:]:
+                    d2 = date_slots[s2][0]
+                    if (d2 - d1).days > MAX_AWAY_GAP_DAYS:
+                        break
+                    between = [
+                        ta[(team_id, sb)]
+                        for sb in range(s1 + 1, s2)
+                        if (team_id, sb) in ta
+                    ]
+                    model.Add(
+                        sum(away_s[(team_id, s1)]) + sum(away_s[(team_id, s2)])
+                        <= 1 + sum(between)
+                    )
 
     # ─────────────────────────────────────────────────────────────────────────
 
@@ -275,7 +265,7 @@ def solve_schedule(
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 30.0
-    solver.parameters.num_search_workers = 1
+    solver.parameters.num_search_workers = 4
     status = solver.Solve(model)
 
     games: List[Game] = []
