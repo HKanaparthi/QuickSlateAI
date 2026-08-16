@@ -276,6 +276,8 @@ def solve_schedule(
                     break
 
         solver_status = "OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE"
+        if constraints.no_back_to_back_away:
+            games = _repair_back_to_back_away(games, team_ids, date_slots, constraints.min_rest_days)
     else:
         games = _greedy_fallback(matchups, date_slots, team_by_id, venues, rivalry_set, constraints)
         solver_status = "GREEDY_FALLBACK"
@@ -293,6 +295,60 @@ def solve_schedule(
         generated_at=str(date.today()),
         solver_status=solver_status,
     )
+
+
+def _repair_back_to_back_away(
+    games: List[Game],
+    team_ids: List[str],
+    date_slots: List[Tuple[date, str]],
+    min_rest: int,
+) -> List[Game]:
+    """Post-solve greedy repair: move a home game into the gap between consecutive away games."""
+    slot_set: Set[Tuple[str, date, str]] = {
+        (g.venue_id, g.game_date, g.timeslot) for g in games
+    }
+    for _ in range(8):
+        any_fixed = False
+        for team_id in team_ids:
+            t_games = sorted(
+                (g for g in games if g.home_team_id == team_id or g.away_team_id == team_id),
+                key=lambda g: g.game_date,
+            )
+            for i in range(len(t_games) - 1):
+                g1, g2 = t_games[i], t_games[i + 1]
+                if not (g1.away_team_id == team_id and g2.away_team_id == team_id):
+                    continue
+                d1, d2 = g1.game_date, g2.game_date
+                for hg in games:
+                    if hg.home_team_id != team_id or d1 <= hg.game_date <= d2:
+                        continue
+                    opp = hg.away_team_id
+                    t_other = {g.game_date for g in games
+                               if g.id != hg.id and (g.home_team_id == team_id or g.away_team_id == team_id)}
+                    o_other = {g.game_date for g in games
+                               if g.id != hg.id and (g.home_team_id == opp or g.away_team_id == opp)}
+                    moved = False
+                    for cand_d, cand_s in date_slots:
+                        if not (d1 < cand_d < d2):
+                            continue
+                        if (hg.venue_id, cand_d, cand_s) in slot_set:
+                            continue
+                        if any(abs((cand_d - d).days) < min_rest for d in t_other):
+                            continue
+                        if any(abs((cand_d - d).days) < min_rest for d in o_other):
+                            continue
+                        slot_set.discard((hg.venue_id, hg.game_date, hg.timeslot))
+                        hg.game_date = cand_d
+                        hg.timeslot = cand_s
+                        slot_set.add((hg.venue_id, cand_d, cand_s))
+                        moved = any_fixed = True
+                        break
+                    if moved:
+                        break
+        if not any_fixed:
+            break
+    games.sort(key=lambda g: g.game_date)
+    return games
 
 
 def _greedy_fallback(matchups, date_slots, team_by_id, venues, rivalry_set, constraints):
