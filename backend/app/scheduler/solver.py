@@ -208,6 +208,50 @@ def solve_schedule(
 
     # ─────────────────────────────────────────────────────────────────────────
 
+    # ── No back-to-back away games ────────────────────────────────────────────
+    # Two away-game slots s1 < s2 for the same team are "consecutive" when the
+    # team has no game between them. The constraint forbids that pattern by
+    # requiring sum(between_game_indicators) >= 1 whenever both slots are away.
+    # Formulation: away[s1] + away[s2] <= 1 + any_team_game_between(s1, s2)
+    if constraints.no_back_to_back_away:
+        # Precompute per (team, slot): away-game x-vars and any-game x-vars
+        away_s: Dict[Tuple[str, int], List] = {}
+        any_s: Dict[Tuple[str, int], List] = {}
+        for m, (h, a) in enumerate(matchups):
+            for s in range(n_slots):
+                any_s.setdefault((h, s), []).append(x[m][s])
+                any_s.setdefault((a, s), []).append(x[m][s])
+                away_s.setdefault((a, s), []).append(x[m][s])
+
+        # Auxiliary BoolVar: team plays ANY game (home or away) at slot s
+        ta: Dict[Tuple[str, int], object] = {}
+        for (tid, s), vlist in any_s.items():
+            b = model.NewBoolVar(f"ta_{tid[:4]}_{s}")
+            model.Add(sum(vlist) >= 1).OnlyEnforceIf(b)
+            model.Add(sum(vlist) == 0).OnlyEnforceIf(b.Not())
+            ta[(tid, s)] = b
+
+        MAX_AWAY_GAP_DAYS = 70  # covers gaps up to 10 weeks between consecutive games
+        for team_id in team_ids:
+            a_slots = sorted(s for s in range(n_slots) if away_s.get((team_id, s)))
+            for i, s1 in enumerate(a_slots):
+                d1 = date_slots[s1][0]
+                for s2 in a_slots[i + 1:]:
+                    d2 = date_slots[s2][0]
+                    if (d2 - d1).days > MAX_AWAY_GAP_DAYS:
+                        break
+                    between = [
+                        ta[(team_id, sb)]
+                        for sb in range(s1 + 1, s2)
+                        if (team_id, sb) in ta
+                    ]
+                    model.Add(
+                        sum(away_s[(team_id, s1)]) + sum(away_s[(team_id, s2)])
+                        <= 1 + sum(between)
+                    )
+
+    # ─────────────────────────────────────────────────────────────────────────
+
     # Objective: maximize primetime placement for rivalry games + minimize travel
     objective_terms = []
     for m, (home_id, away_id) in enumerate(matchups):
