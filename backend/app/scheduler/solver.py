@@ -231,7 +231,7 @@ def solve_schedule(
             model.Add(sum(vlist) == 0).OnlyEnforceIf(b.Not())
             ta[(tid, s)] = b
 
-        MAX_AWAY_GAP_DAYS = 21  # 3-week window matches max idle-week gap from SPACING_WINDOW=3
+        MAX_AWAY_GAP_DAYS = 56  # 8-week window; sparse seasons can have ~6-week gaps between consecutive games
         for team_id in team_ids:
             a_slots = sorted(s for s in range(n_slots) if away_s.get((team_id, s)))
             for i, s1 in enumerate(a_slots):
