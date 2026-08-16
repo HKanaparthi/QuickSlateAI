@@ -208,61 +208,6 @@ def solve_schedule(
 
     # ─────────────────────────────────────────────────────────────────────────
 
-    # ── No back-to-back away games ────────────────────────────────────────────
-    # Uses AddBoolOr (SAT clause) instead of linear inequalities — SAT clauses
-    # are propagated in O(1) by the watched-literal scheme, making this ~100x
-    # faster for presolve than sum(X) + sum(Y) <= 1 + sum(Z) linear forms.
-    if constraints.no_back_to_back_away:
-        away_s: Dict[Tuple[str, int], List] = {}
-        any_s: Dict[Tuple[str, int], List] = {}
-        for m, (h, a) in enumerate(matchups):
-            for s in range(n_slots):
-                any_s.setdefault((h, s), []).append(x[m][s])
-                any_s.setdefault((a, s), []).append(x[m][s])
-                away_s.setdefault((a, s), []).append(x[m][s])
-
-        # ta[team, slot]: team plays any game at slot s
-        ta: Dict[Tuple[str, int], object] = {}
-        for (tid, s), vlist in any_s.items():
-            b = model.NewBoolVar(f"ta_{tid[:4]}_{s}")
-            model.Add(sum(vlist) >= 1).OnlyEnforceIf(b)
-            model.Add(sum(vlist) == 0).OnlyEnforceIf(b.Not())
-            ta[(tid, s)] = b
-
-        # pa[team, slot]: team plays away at slot s
-        pa: Dict[Tuple[str, int], object] = {}
-        for team_id in team_ids:
-            for s in range(n_slots):
-                a_vars = away_s.get((team_id, s), [])
-                if a_vars:
-                    b = model.NewBoolVar(f"pa_{team_id[:4]}_{s}")
-                    model.Add(sum(a_vars) >= 1).OnlyEnforceIf(b)
-                    model.Add(sum(a_vars) == 0).OnlyEnforceIf(b.Not())
-                    pa[(team_id, s)] = b
-
-        MAX_AWAY_GAP_DAYS = 120
-        for team_id in team_ids:
-            a_slots = sorted(s for s in range(n_slots) if away_s.get((team_id, s)))
-            for i, s1 in enumerate(a_slots):
-                d1 = date_slots[s1][0]
-                pa_s1 = pa.get((team_id, s1))
-                if pa_s1 is None:
-                    continue
-                for s2 in a_slots[i + 1:]:
-                    d2 = date_slots[s2][0]
-                    if (d2 - d1).days > MAX_AWAY_GAP_DAYS:
-                        break
-                    pa_s2 = pa.get((team_id, s2))
-                    if pa_s2 is None:
-                        continue
-                    between = [
-                        ta[(team_id, sb)]
-                        for sb in range(s1 + 1, s2)
-                        if (team_id, sb) in ta
-                    ]
-                    # SAT clause: ¬pa_s1 ∨ ¬pa_s2 ∨ any_game_between
-                    model.AddBoolOr([pa_s1.Not(), pa_s2.Not()] + between)
-
     # ─────────────────────────────────────────────────────────────────────────
 
     # Objective: maximize primetime placement for rivalry games + minimize travel
