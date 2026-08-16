@@ -231,7 +231,7 @@ def solve_schedule(
             model.Add(sum(vlist) == 0).OnlyEnforceIf(b.Not())
             ta[(tid, s)] = b
 
-        MAX_AWAY_GAP_DAYS = 70  # covers gaps up to 10 weeks between consecutive games
+        MAX_AWAY_GAP_DAYS = 21  # 3-week window matches max idle-week gap from SPACING_WINDOW=3
         for team_id in team_ids:
             a_slots = sorted(s for s in range(n_slots) if away_s.get((team_id, s)))
             for i, s1 in enumerate(a_slots):
@@ -271,7 +271,7 @@ def solve_schedule(
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 30.0
-    solver.parameters.num_search_workers = 4
+    solver.parameters.num_search_workers = 1
     status = solver.Solve(model)
 
     games: List[Game] = []
