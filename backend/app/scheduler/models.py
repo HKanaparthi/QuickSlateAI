@@ -89,7 +89,6 @@ class ScheduleConstraints(BaseModel):
     rivalry_pairs: List[List[str]] = []
     home_away_balanced: bool = True
     no_back_to_back_away: bool = True
-    weather_constraint: bool = False
     # Broadcaster contractual commitments (hard constraints)
     broadcast_contracts: List[BroadcastContract] = []
     # Venue blackout windows (hard constraints — no games at venue during these dates)
@@ -103,6 +102,11 @@ class ScheduleConstraints(BaseModel):
     even_distribution: bool = True
     target_games_per_week: int = 4             # Aim for this many total games per week
     games_per_week_tolerance: int = 1          # Allow ±tolerance from target
+    # Opponent rotation — how many times each pair of teams plays
+    games_per_pair: int = 2                    # used when no divisions configured
+    divisions: List[List[str]] = []            # list of team_id groups per division
+    games_between_division_opponents: int = 4
+    games_between_nondivision_opponents: int = 2
 
 
 class Game(BaseModel):

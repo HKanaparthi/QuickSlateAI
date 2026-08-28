@@ -74,8 +74,11 @@ export interface ScheduleConstraints {
   rivalry_pairs: string[][];
   home_away_balanced: boolean;
   no_back_to_back_away: boolean;
-  weather_constraint: boolean;
   broadcast_contracts: BroadcastContract[];
+  games_per_pair: number;
+  divisions: string[][];
+  games_between_division_opponents: number;
+  games_between_nondivision_opponents: number;
 }
 
 export interface Schedule {

@@ -30,7 +30,6 @@ export async function generateSchedule(payload: {
   rivalry_pairs: string[][];
   home_away_balanced: boolean;
   no_back_to_back_away: boolean;
-  weather_constraint: boolean;
   use_default_rivalries: boolean;
   max_games_per_slot_per_week: number;
   min_distinct_slots_per_week: number;
@@ -41,6 +40,10 @@ export async function generateSchedule(payload: {
   venue_blackouts: VenueBlackout[];
   travel_optimization_weight: number;
   cba_profile_id?: string | null;
+  games_per_pair: number;
+  divisions: string[][];
+  games_between_division_opponents: number;
+  games_between_nondivision_opponents: number;
 }) {
   const res = await api.post('/schedule/generate', payload);
   return res.data;

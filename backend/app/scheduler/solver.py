@@ -40,6 +40,34 @@ def haversine_miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float
     return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
+def _build_matchups(
+    team_ids: List[str],
+    constraints: ScheduleConstraints,
+) -> List[Tuple[str, str]]:
+    """Generate all (home, away) matchup pairs respecting division structure and game counts."""
+    division_of: Dict[str, int] = {}
+    for div_idx, div_teams in enumerate(constraints.divisions):
+        for t in div_teams:
+            division_of[t] = div_idx
+
+    matchups: List[Tuple[str, str]] = []
+    for i in range(len(team_ids)):
+        for j in range(i + 1, len(team_ids)):
+            t1, t2 = team_ids[i], team_ids[j]
+            if constraints.divisions and division_of:
+                d1, d2 = division_of.get(t1), division_of.get(t2)
+                same_div = d1 is not None and d1 == d2
+                n = constraints.games_between_division_opponents if same_div else constraints.games_between_nondivision_opponents
+            else:
+                n = constraints.games_per_pair
+            # Distribute home games: t1 gets ceil(n/2), t2 gets floor(n/2)
+            for _ in range((n + 1) // 2):
+                matchups.append((t1, t2))
+            for _ in range(n // 2):
+                matchups.append((t2, t1))
+    return matchups
+
+
 def build_date_slots(start: date, end: date) -> List[Tuple[date, str]]:
     slots = []
     current = start
@@ -57,11 +85,20 @@ def analyze_feasibility(
     venues: Dict[str, Venue],
 ) -> Dict:
     """Pre-solve analysis: detect constraint conflicts before running the optimizer."""
+    from collections import Counter
     n_teams = len(teams)
-    n_games = n_teams * (n_teams - 1)
+    team_ids = [t.id for t in teams]
+    matchups = _build_matchups(team_ids, constraints)
+    n_games = len(matchups)
     date_slots = build_date_slots(constraints.season_start, constraints.season_end)
     n_slots = len(date_slots)
     season_days = (constraints.season_end - constraints.season_start).days
+
+    team_game_count: Counter = Counter()
+    for h, a in matchups:
+        team_game_count[h] += 1
+        team_game_count[a] += 1
+    games_per_team = max(team_game_count.values()) if team_game_count else 2 * (n_teams - 1)
 
     issues = []
     warnings = []
@@ -77,7 +114,6 @@ def analyze_feasibility(
 
     # Rest constraint tightness
     max_games_per_team = season_days // max(constraints.min_rest_days, 1)
-    games_per_team = 2 * (n_teams - 1)
     if max_games_per_team < games_per_team:
         issues.append({
             "type": "rest_constraint_infeasible",
@@ -166,11 +202,7 @@ def solve_schedule(
             rivalry_set.add((pair[0], pair[1]))
             rivalry_set.add((pair[1], pair[0]))
 
-    matchups: List[Tuple[str, str]] = []
-    for i in range(n_teams):
-        for j in range(n_teams):
-            if i != j:
-                matchups.append((team_ids[i], team_ids[j]))  # (home, away)
+    matchups: List[Tuple[str, str]] = _build_matchups(team_ids, constraints)
 
     date_slots = build_date_slots(constraints.season_start, constraints.season_end)
     if not date_slots:
@@ -256,6 +288,43 @@ def solve_schedule(
             # At most 1 game for this team in the min_rest-day window starting at d1
             if len(window_vars) > 1:
                 model.Add(sum(window_vars) <= 1)
+
+    # ── No consecutive away games (CP-SAT hard constraint) ───────────────────
+    # For each team T and each pair of dates (d1, d2) within max_gap_days:
+    #   If both have possible away games for T:
+    #     If no game is possible for T between d1 and d2:  away[d1] + away[d2] ≤ 1
+    #     If games are possible between:  away[d1] + away[d2] ≤ 1 + any_between
+    # This is correct because "consecutive" means no game between the two dates.
+    if constraints.no_back_to_back_away:
+        max_gap_days = max(7, 2 * min_rest + 1)
+
+        t_date_away: Dict[str, Dict[date, List]] = {tid: {} for tid in team_ids}
+        t_date_any: Dict[str, Dict[date, List]] = {tid: {} for tid in team_ids}
+
+        for m, (home_id, away_id) in enumerate(matchups):
+            for s, (d, _) in enumerate(date_slots):
+                t_date_away[away_id].setdefault(d, []).append(x[m][s])
+                t_date_any[home_id].setdefault(d, []).append(x[m][s])
+                t_date_any[away_id].setdefault(d, []).append(x[m][s])
+
+        for tid in team_ids:
+            away_dates = sorted(t_date_away[tid].keys())
+            for i, d1 in enumerate(away_dates):
+                vars_d1 = t_date_away[tid][d1]
+                for d2 in away_dates[i + 1:]:
+                    if (d2 - d1).days > max_gap_days:
+                        break
+                    vars_d2 = t_date_away[tid][d2]
+                    between_vars = [
+                        v
+                        for d_mid, vlist in t_date_any[tid].items()
+                        if d1 < d_mid < d2
+                        for v in vlist
+                    ]
+                    if between_vars:
+                        model.Add(sum(vars_d1) + sum(vars_d2) <= 1 + sum(between_vars))
+                    else:
+                        model.Add(sum(vars_d1) + sum(vars_d2) <= 1)
 
     # ── Timeslot distribution & even weekly spread ───────────────────────────
     # Build (week_key, slot) → [vars] and week_key → [vars] indices

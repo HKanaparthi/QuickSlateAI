@@ -27,7 +27,6 @@ class GenerateRequest(BaseModel):
     rivalry_pairs: List[List[str]] = []
     home_away_balanced: bool = True
     no_back_to_back_away: bool = True
-    weather_constraint: bool = False
     use_default_rivalries: bool = True
     max_games_per_slot_per_week: int = 2
     min_distinct_slots_per_week: int = 3
@@ -38,6 +37,11 @@ class GenerateRequest(BaseModel):
     venue_blackouts: List[dict] = []
     travel_optimization_weight: float = 1.0
     cba_profile_id: Optional[str] = None
+    # Opponent rotation
+    games_per_pair: int = 2
+    divisions: List[List[str]] = []
+    games_between_division_opponents: int = 4
+    games_between_nondivision_opponents: int = 2
 
 
 class UpdateGameRequest(BaseModel):
@@ -133,7 +137,6 @@ def generate_schedule(req: GenerateRequest):
         rivalry_pairs=rivalry_pairs,
         home_away_balanced=home_away,
         no_back_to_back_away=no_b2b,
-        weather_constraint=req.weather_constraint,
         broadcast_contracts=broadcast_contracts,
         venue_blackouts=venue_blackouts,
         travel_optimization_weight=travel_weight,
@@ -142,6 +145,10 @@ def generate_schedule(req: GenerateRequest):
         even_distribution=even_dist,
         target_games_per_week=target_gpw,
         games_per_week_tolerance=gpw_tol,
+        games_per_pair=req.games_per_pair,
+        divisions=req.divisions,
+        games_between_division_opponents=req.games_between_division_opponents,
+        games_between_nondivision_opponents=req.games_between_nondivision_opponents,
     )
 
     feasibility = analyze_feasibility(constraints, league.teams, VENUES_BY_ID)

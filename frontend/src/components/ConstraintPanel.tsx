@@ -14,7 +14,6 @@ interface ConstraintPanelProps {
     rivalry_pairs: string[][];
     home_away_balanced: boolean;
     no_back_to_back_away: boolean;
-    weather_constraint: boolean;
     use_default_rivalries: boolean;
     max_games_per_slot_per_week: number;
     min_distinct_slots_per_week: number;
@@ -25,6 +24,10 @@ interface ConstraintPanelProps {
     venue_blackouts: VenueBlackout[];
     travel_optimization_weight: number;
     cba_profile_id: string | null;
+    games_per_pair: number;
+    divisions: string[][];
+    games_between_division_opponents: number;
+    games_between_nondivision_opponents: number;
   }) => void;
   isLoading: boolean;
 }
@@ -86,7 +89,12 @@ export default function ConstraintPanel({ onGenerate, isLoading }: ConstraintPan
   const [customRivalries, setCustomRivalries] = useState<string[][]>([]);
   const [homeAwayBalanced, setHomeAwayBalanced] = useState(true);
   const [noBackToBackAway, setNoBackToBackAway] = useState(true);
-  const [weatherConstraint, setWeatherConstraint] = useState(false);
+  // Opponent rotation
+  const [useDivisions, setUseDivisions] = useState(false);
+  const [gamesPerPair, setGamesPerPair] = useState(2);
+  const [divisionAssignments, setDivisionAssignments] = useState<Record<string, number>>({});
+  const [divGames, setDivGames] = useState(4);
+  const [nonDivGames, setNonDivGames] = useState(2);
   const [maxGamesPerSlotPerWeek, setMaxGamesPerSlotPerWeek] = useState(2);
   const [minDistinctSlotsPerWeek, setMinDistinctSlotsPerWeek] = useState(3);
   const [evenDistribution, setEvenDistribution] = useState(true);
@@ -158,6 +166,14 @@ export default function ConstraintPanel({ onGenerate, isLoading }: ConstraintPan
       ? DEFAULT_RIVALRY_PAIRS[leagueId] || []
       : customRivalries;
 
+    // Build divisions array from team assignments
+    const divisionsArray: string[][] = useDivisions
+      ? [
+          currentTeams.filter(t => (divisionAssignments[t.id] ?? 0) === 0).map(t => t.id),
+          currentTeams.filter(t => (divisionAssignments[t.id] ?? 0) === 1).map(t => t.id),
+        ].filter(d => d.length > 0)
+      : [];
+
     onGenerate({
       league_id: leagueId,
       season_start: seasonStart,
@@ -168,7 +184,6 @@ export default function ConstraintPanel({ onGenerate, isLoading }: ConstraintPan
       rivalry_pairs: rivalryPairs,
       home_away_balanced: homeAwayBalanced,
       no_back_to_back_away: noBackToBackAway,
-      weather_constraint: weatherConstraint,
       use_default_rivalries: useDefaultRivalries,
       max_games_per_slot_per_week: maxGamesPerSlotPerWeek,
       min_distinct_slots_per_week: minDistinctSlotsPerWeek,
@@ -179,6 +194,10 @@ export default function ConstraintPanel({ onGenerate, isLoading }: ConstraintPan
       venue_blackouts: venueBlackouts,
       travel_optimization_weight: travelOptWeight,
       cba_profile_id: selectedProfileId,
+      games_per_pair: useDivisions ? 2 : gamesPerPair,
+      divisions: divisionsArray,
+      games_between_division_opponents: divGames,
+      games_between_nondivision_opponents: nonDivGames,
     });
   };
 
@@ -352,8 +371,7 @@ export default function ConstraintPanel({ onGenerate, isLoading }: ConstraintPan
 
         <div className="mt-4 flex flex-wrap gap-4">
           <Toggle label="Home/Away Balanced" value={homeAwayBalanced} onChange={setHomeAwayBalanced} />
-          <Toggle label="No Back-to-Back Away Games" value={noBackToBackAway} onChange={setNoBackToBackAway} />
-          <Toggle label="Weather Constraints (outdoor venues)" value={weatherConstraint} onChange={setWeatherConstraint} />
+          <Toggle label="No Consecutive Away Games (CP-SAT)" value={noBackToBackAway} onChange={setNoBackToBackAway} />
         </div>
       </div>
 
@@ -660,9 +678,11 @@ export default function ConstraintPanel({ onGenerate, isLoading }: ConstraintPan
               <ul className="space-y-1.5 text-xs text-dark-400">
                 <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>Venue exclusivity — one game per venue per slot</li>
                 <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>Minimum rest days between games</li>
+                <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>No consecutive away games — CP-SAT hard constraint</li>
                 <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>Weekly travel cap — max miles per team per week</li>
                 <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>Broadcaster commitments — required game counts per timeslot</li>
                 <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>Venue availability — blackout windows fully blocked from solver</li>
+                <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>Opponent rotation — configurable games per matchup pair</li>
                 <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>Weekly game-volume band — no feast-or-famine weeks</li>
                 <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>Season spacing — games every 1–2 weeks, never 3 consecutive idle</li>
               </ul>
@@ -677,9 +697,100 @@ export default function ConstraintPanel({ onGenerate, isLoading }: ConstraintPan
                 <li className="flex items-start gap-2"><span className="text-primary-500 mt-0.5">→</span>Primetime placement for rivalry games (+20 score bonus)</li>
                 <li className="flex items-start gap-2"><span className="text-primary-500 mt-0.5">→</span>Travel minimization — long away trips penalized in objective</li>
                 <li className="flex items-start gap-2"><span className="text-primary-500 mt-0.5">→</span>Viewership maximization via slot multipliers</li>
-                <li className="flex items-start gap-2"><span className="text-warning mt-0.5">~</span>Home/away balance — post-solve validation (yellow warning)</li>
-                <li className="flex items-start gap-2"><span className="text-warning mt-0.5">~</span>Back-to-back away repair — greedy post-solve pass</li>
+                <li className="flex items-start gap-2"><span className="text-warning mt-0.5">~</span>Home/away balance — validated post-solve (yellow warning if &gt;15% gap)</li>
               </ul>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Opponent Rotation */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="section-title mb-0">Opponent Rotation</h3>
+            <p className="text-xs text-dark-600 mt-0.5">
+              How many times each pair of teams plays. Use divisions for conference-style structures.
+            </p>
+          </div>
+          <Toggle label="Use divisions" value={useDivisions} onChange={v => { setUseDivisions(v); if (!v) setDivisionAssignments({}); }} />
+        </div>
+
+        {!useDivisions ? (
+          <div>
+            <label className="label">
+              Games per matchup (each pair):{' '}
+              <span className="text-primary-500 font-bold">{gamesPerPair}</span>
+            </label>
+            <input
+              type="range" min={1} max={4} value={gamesPerPair}
+              onChange={e => setGamesPerPair(+e.target.value)}
+              className="w-full accent-primary-600"
+            />
+            <div className="flex justify-between text-xs text-dark-600 mt-1">
+              <span>1 game (one-way)</span><span>4 games</span>
+            </div>
+            <p className="text-xs text-dark-600 mt-1">
+              {gamesPerPair === 2
+                ? 'Default: each pair plays once home, once away — perfectly balanced.'
+                : gamesPerPair === 1
+                ? '1 game per pair: home team determined by seeding order. Total games = n×(n-1)/2.'
+                : `${gamesPerPair} games per pair: home games split as evenly as possible.`}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">Division games (each pair):{' '}
+                  <span className="text-primary-500 font-bold">{divGames}</span>
+                </label>
+                <input type="range" min={2} max={6} step={2} value={divGames}
+                  onChange={e => setDivGames(+e.target.value)} className="w-full accent-primary-600" />
+                <div className="flex justify-between text-xs text-dark-600 mt-1"><span>2</span><span>6</span></div>
+              </div>
+              <div>
+                <label className="label">Non-division games (each pair):{' '}
+                  <span className="text-primary-500 font-bold">{nonDivGames}</span>
+                </label>
+                <input type="range" min={1} max={4} value={nonDivGames}
+                  onChange={e => setNonDivGames(+e.target.value)} className="w-full accent-primary-600" />
+                <div className="flex justify-between text-xs text-dark-600 mt-1"><span>1</span><span>4</span></div>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-dark-500 font-medium mb-2">Assign teams to divisions:</p>
+              <div className="space-y-1.5">
+                {currentTeams.map(t => {
+                  const div = divisionAssignments[t.id] ?? 0;
+                  return (
+                    <div key={t.id} className="flex items-center justify-between bg-dark-700/60 rounded px-3 py-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }} />
+                        <span className="text-sm text-dark-400">{t.name}</span>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setDivisionAssignments(prev => ({ ...prev, [t.id]: 0 }))}
+                          className={`px-2 py-0.5 rounded text-xs font-medium transition-all ${div === 0 ? 'bg-primary-600 text-white' : 'border border-dark-600 text-dark-500 hover:border-primary-600'}`}
+                        >Div 1</button>
+                        <button
+                          type="button"
+                          onClick={() => setDivisionAssignments(prev => ({ ...prev, [t.id]: 1 }))}
+                          className={`px-2 py-0.5 rounded text-xs font-medium transition-all ${div === 1 ? 'bg-warning text-dark-900' : 'border border-dark-600 text-dark-500 hover:border-warning'}`}
+                        >Div 2</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-dark-600 mt-2">
+                Div 1:{' '}
+                <span className="text-dark-400">{currentTeams.filter(t => (divisionAssignments[t.id] ?? 0) === 0).length} teams</span>
+                {' · '}Div 2:{' '}
+                <span className="text-dark-400">{currentTeams.filter(t => (divisionAssignments[t.id] ?? 0) === 1).length} teams</span>
+              </p>
             </div>
           </div>
         )}
