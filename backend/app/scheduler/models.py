@@ -54,6 +54,31 @@ class League(BaseModel):
     teams: List[Team]
 
 
+class BroadcastContract(BaseModel):
+    network: str           # "ESPN", "FOX", "CBS", etc.
+    timeslot: str          # must match a TimeSlot value
+    required_games: int    # hard lower bound — solver MUST satisfy
+    max_games: int         # hard upper bound
+    rivalry_priority: bool = False
+
+
+class VenueBlackout(BaseModel):
+    venue_id: str
+    start_date: date
+    end_date: date
+    reason: str = ""
+
+
+class ScoreBreakdown(BaseModel):
+    timeslot_score: int          # viewership multiplier × 10
+    rivalry_bonus: int           # +20 if rivalry in primetime, else 0
+    travel_miles: float          # one-way trip for away team
+    travel_budget_pct: int       # travel_miles / weekly_budget * 100
+    travel_penalty: int          # subtracted from objective when travel_optimization_weight > 0
+    total_objective_score: int   # timeslot_score + rivalry_bonus - travel_penalty
+    summary: str                 # human-readable rationale
+
+
 class ScheduleConstraints(BaseModel):
     league_id: str
     season_start: date
@@ -65,6 +90,12 @@ class ScheduleConstraints(BaseModel):
     home_away_balanced: bool = True
     no_back_to_back_away: bool = True
     weather_constraint: bool = False
+    # Broadcaster contractual commitments (hard constraints)
+    broadcast_contracts: List[BroadcastContract] = []
+    # Venue blackout windows (hard constraints — no games at venue during these dates)
+    venue_blackouts: List[VenueBlackout] = []
+    # Travel in objective: 0 = ignore, 1.0 = standard weight (~10 pts per 1000 mi)
+    travel_optimization_weight: float = 1.0
     # Timeslot distribution
     max_games_per_slot_per_week: int = 2      # No more than N games in same timeslot per week
     min_distinct_slots_per_week: int = 3       # At least N different timeslots used per week
@@ -84,6 +115,8 @@ class Game(BaseModel):
     is_rivalry: bool = False
     ai_explanation: Optional[str] = None
     projected_viewership: Optional[int] = None
+    travel_miles: Optional[float] = None
+    score_breakdown: Optional[ScoreBreakdown] = None
 
 
 class Schedule(BaseModel):

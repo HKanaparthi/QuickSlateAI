@@ -84,6 +84,28 @@ def check_home_away_balance(team_id: str, games: List[Game]) -> List[Dict]:
     return violations
 
 
+def check_broadcast_compliance(games: List[Game], constraints: ScheduleConstraints) -> List[Dict]:
+    """Verify broadcaster contractual commitments are met (hard constraints)."""
+    compliance = []
+    for contract in constraints.broadcast_contracts:
+        actual = sum(1 for g in games if g.timeslot == contract.timeslot)
+        if actual < contract.required_games:
+            status = "UNDER"
+        elif actual > contract.max_games:
+            status = "OVER"
+        else:
+            status = "OK"
+        compliance.append({
+            "network": contract.network,
+            "timeslot": contract.timeslot,
+            "required": contract.required_games,
+            "max": contract.max_games,
+            "actual": actual,
+            "status": status,
+        })
+    return compliance
+
+
 def validate_schedule(
     games: List[Game],
     constraints: ScheduleConstraints,
@@ -100,6 +122,27 @@ def validate_schedule(
         if constraints.home_away_balanced:
             all_violations.extend(check_home_away_balance(team.id, games))
 
+    broadcast_compliance = check_broadcast_compliance(games, constraints)
+    for item in broadcast_compliance:
+        if item["status"] == "UNDER":
+            all_violations.append({
+                "type": "broadcast_undercount",
+                "severity": "RED",
+                "message": (
+                    f"{item['network']} requires {item['required']} games in "
+                    f"'{item['timeslot']}' — only {item['actual']} scheduled"
+                ),
+            })
+        elif item["status"] == "OVER":
+            all_violations.append({
+                "type": "broadcast_overcount",
+                "severity": "YELLOW",
+                "message": (
+                    f"{item['network']} max {item['max']} games in "
+                    f"'{item['timeslot']}' — {item['actual']} scheduled"
+                ),
+            })
+
     red = [v for v in all_violations if v["severity"] == "RED"]
     yellow = [v for v in all_violations if v["severity"] == "YELLOW"]
 
@@ -108,4 +151,5 @@ def validate_schedule(
         "red_count": len(red),
         "yellow_count": len(yellow),
         "status": "RED" if red else ("YELLOW" if yellow else "GREEN"),
+        "broadcast_compliance": broadcast_compliance,
     }

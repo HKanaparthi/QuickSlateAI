@@ -96,8 +96,44 @@ export default function GameCard({ game, onClose, onExplain }: GameCardProps) {
             )}
           </div>
 
+          {/* Optimizer Score Breakdown */}
+          {game.score_breakdown && (
+            <div className="mt-3 p-3 bg-dark-700 rounded-lg">
+              <span className="text-xs font-medium text-primary-500 uppercase tracking-wide block mb-2.5">
+                Why the optimizer chose this slot
+              </span>
+              <div className="space-y-1.5 text-xs">
+                <ScoreLine
+                  label="Timeslot value"
+                  value={`+${game.score_breakdown.timeslot_score}`}
+                  note={game.timeslot}
+                  color="text-success"
+                />
+                {game.score_breakdown.rivalry_bonus > 0 && (
+                  <ScoreLine
+                    label="Rivalry bonus"
+                    value={`+${game.score_breakdown.rivalry_bonus}`}
+                    note="rivalry in primetime"
+                    color="text-warning"
+                  />
+                )}
+                <ScoreLine
+                  label="Travel"
+                  value={`${game.score_breakdown.travel_miles.toFixed(0)} mi`}
+                  note={`${game.score_breakdown.travel_budget_pct}% of weekly budget`}
+                  color={game.score_breakdown.travel_budget_pct > 75 ? 'text-warning' : 'text-dark-400'}
+                />
+                <div className="border-t border-dark-600 pt-1.5 mt-1.5 flex justify-between">
+                  <span className="text-dark-500">Objective score</span>
+                  <span className="font-semibold text-white">+{game.score_breakdown.total_objective_score}</span>
+                </div>
+              </div>
+              <p className="text-xs text-dark-600 mt-2 italic">{game.score_breakdown.summary}</p>
+            </div>
+          )}
+
           {/* AI Explanation */}
-          <div className="mt-4 p-3 bg-dark-700 rounded-lg">
+          <div className="mt-3 p-3 bg-dark-700 rounded-lg">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-primary-500 uppercase tracking-wide">
                 AI Scheduling Insight
@@ -139,6 +175,18 @@ function DetailRow({ icon, label, value }: { icon: string; label: string; value:
       <div>
         <p className="text-dark-600 text-xs">{label}</p>
         <p className="text-white text-sm font-medium">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function ScoreLine({ label, value, note, color }: { label: string; value: string; note: string; color: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-dark-500">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className="text-dark-600 text-xs">{note}</span>
+        <span className={`font-semibold w-12 text-right ${color}`}>{value}</span>
       </div>
     </div>
   );
