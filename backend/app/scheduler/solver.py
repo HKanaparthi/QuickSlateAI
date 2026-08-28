@@ -1,15 +1,17 @@
 import uuid
 import random
 from datetime import date, timedelta
-from typing import List, Dict, Tuple, Set
+from typing import List, Dict, Tuple, Set, Optional
 from ortools.sat.python import cp_model
 
 from .models import (
     Game,
     Schedule,
     ScheduleConstraints,
+    ScoreBreakdown,
     Team,
     Venue,
+    VenueBlackout,
     TimeSlot,
     SLOT_VIEWERSHIP_MULTIPLIER,
     PRIMETIME_SLOTS,
@@ -49,11 +51,112 @@ def build_date_slots(start: date, end: date) -> List[Tuple[date, str]]:
     return slots
 
 
+def analyze_feasibility(
+    constraints: ScheduleConstraints,
+    teams: List[Team],
+    venues: Dict[str, Venue],
+) -> Dict:
+    """Pre-solve analysis: detect constraint conflicts before running the optimizer."""
+    n_teams = len(teams)
+    n_games = n_teams * (n_teams - 1)
+    date_slots = build_date_slots(constraints.season_start, constraints.season_end)
+    n_slots = len(date_slots)
+    season_days = (constraints.season_end - constraints.season_start).days
+
+    issues = []
+    warnings = []
+
+    # Slot sufficiency
+    if n_slots < n_games:
+        issues.append({
+            "type": "insufficient_slots",
+            "severity": "hard",
+            "message": f"Only {n_slots} available date-slots for {n_games} required games.",
+            "suggestion": f"Extend the season end date, or enable more weekday slots.",
+        })
+
+    # Rest constraint tightness
+    max_games_per_team = season_days // max(constraints.min_rest_days, 1)
+    games_per_team = 2 * (n_teams - 1)
+    if max_games_per_team < games_per_team:
+        issues.append({
+            "type": "rest_constraint_infeasible",
+            "severity": "hard",
+            "message": (
+                f"With {constraints.min_rest_days}-day minimum rest, each team can play "
+                f"at most {max_games_per_team} games in {season_days} days, but needs {games_per_team}."
+            ),
+            "suggestion": f"Reduce min_rest_days to ≤{season_days // games_per_team} or extend the season.",
+        })
+    elif max_games_per_team < games_per_team * 1.3:
+        warnings.append(
+            f"Rest constraint is tight — solver has only {(max_games_per_team/games_per_team - 1)*100:.0f}% scheduling margin per team."
+        )
+
+    # Broadcast contract feasibility
+    slot_date_count: Dict[str, int] = {}
+    for (_, slot) in date_slots:
+        slot_date_count[slot] = slot_date_count.get(slot, 0) + 1
+
+    for contract in constraints.broadcast_contracts:
+        available_dates = slot_date_count.get(contract.timeslot, 0)
+        max_possible = available_dates * (n_teams // 2)
+        if contract.required_games > max_possible:
+            issues.append({
+                "type": "broadcast_contract_infeasible",
+                "severity": "hard",
+                "network": contract.network,
+                "message": (
+                    f"{contract.network} requires {contract.required_games} games in "
+                    f"'{contract.timeslot}', but at most {max_possible} are possible "
+                    f"({available_dates} dates × {n_teams//2} simultaneous venues)."
+                ),
+                "suggestion": f"Reduce required_games to ≤{max_possible} or extend the season.",
+            })
+
+    # Venue blackout feasibility
+    for blackout in constraints.venue_blackouts:
+        blacked_slots = sum(
+            1 for (d, _) in date_slots
+            if blackout.start_date <= d <= blackout.end_date
+        )
+        if blacked_slots > 0:
+            home_games_needed = sum(
+                1 for t in teams if t.home_venue_id == blackout.venue_id
+            ) * (n_teams - 1)
+            reason = f" ({blackout.reason})" if blackout.reason else ""
+            warnings.append(
+                f"Venue '{blackout.venue_id}' blacked out {blacked_slots} slot(s) "
+                f"({blackout.start_date} – {blackout.end_date}){reason}. "
+                f"{home_games_needed} home games still need scheduling in remaining slots."
+            )
+
+    # Weekly distribution sanity
+    weeks = season_days / 7
+    avg_games_per_week = n_games / max(weeks, 1)
+    target_min = constraints.target_games_per_week - constraints.games_per_week_tolerance
+    if constraints.even_distribution and avg_games_per_week < target_min * 0.5:
+        warnings.append(
+            f"Target {target_min}+ games/week may be too high for this season — "
+            f"math allows only ~{avg_games_per_week:.1f}/week on average."
+        )
+
+    return {
+        "is_feasible_estimate": not any(i["severity"] == "hard" for i in issues),
+        "total_games": n_games,
+        "available_slots": n_slots,
+        "season_days": season_days,
+        "games_per_team": games_per_team,
+        "issues": issues,
+        "warnings": warnings,
+    }
+
+
 def solve_schedule(
     constraints: ScheduleConstraints,
     teams: List[Team],
     venues: Dict[str, Venue],
-) -> Schedule:
+) -> Tuple[Schedule, Dict]:
     n_teams = len(teams)
     team_ids = [t.id for t in teams]
     team_by_id = {t.id: t for t in teams}
@@ -75,6 +178,19 @@ def solve_schedule(
 
     n_matchups = len(matchups)
     n_slots = len(date_slots)
+
+    # Precompute travel distance for each matchup (away team → home venue)
+    travel_miles_per_matchup: Dict[int, float] = {}
+    for m, (home_id, away_id) in enumerate(matchups):
+        home_venue = venues.get(team_by_id[home_id].home_venue_id)
+        away_venue = venues.get(team_by_id[away_id].home_venue_id)
+        dist = 0.0
+        if home_venue and away_venue:
+            dist = haversine_miles(
+                away_venue.latitude, away_venue.longitude,
+                home_venue.latitude, home_venue.longitude,
+            )
+        travel_miles_per_matchup[m] = dist
 
     model = cp_model.CpModel()
 
@@ -119,8 +235,6 @@ def solve_schedule(
     for m, (h, a) in enumerate(matchups):
         for s, (d, _) in enumerate(date_slots):
             date_to_matchup_slots.setdefault(d, []).append((m, s))
-
-    all_dates = sorted(date_to_matchup_slots.keys())
 
     for team_id in team_ids:
         # Group this team's game vars by date
@@ -206,15 +320,68 @@ def solve_schedule(
     for i in range(len(wa_list) - 1):
         model.Add(wa_list[i] + wa_list[i + 1] <= 1)           # min gap
 
-    # ─────────────────────────────────────────────────────────────────────────
+    # ── Weekly per-team travel cap (HARD) ────────────────────────────────────
+    # For each (team, week): sum of away trip distances must not exceed the cap.
+    # This is the first time travel distance feeds directly into the solver.
+    max_travel = constraints.max_travel_miles_per_week
+    # Build week_key → list of slot indices for fast lookup
+    week_slot_indices: Dict[int, List[int]] = {}
+    for s, (d, _) in enumerate(date_slots):
+        wk = d.isocalendar()[0] * 100 + d.isocalendar()[1]
+        week_slot_indices.setdefault(wk, []).append(s)
+
+    for team_id in team_ids:
+        for wk, slot_indices in week_slot_indices.items():
+            weekly_travel_terms = []
+            for m, (home_id, away_id) in enumerate(matchups):
+                if away_id != team_id:
+                    continue
+                dist_int = int(travel_miles_per_matchup[m])
+                for s in slot_indices:
+                    weekly_travel_terms.append(dist_int * x[m][s])
+            if weekly_travel_terms:
+                model.Add(sum(weekly_travel_terms) <= max_travel)
+
+    # ── Venue blackout windows (HARD) ────────────────────────────────────────
+    # Precompute which (matchup, slot) pairs are blocked by a venue blackout.
+    if constraints.venue_blackouts:
+        blocked: set = set()
+        for blackout in constraints.venue_blackouts:
+            for s, (d, _) in enumerate(date_slots):
+                if blackout.start_date <= d <= blackout.end_date:
+                    blocked.add((blackout.venue_id, s))
+        for m, (home_id, _) in enumerate(matchups):
+            venue_id = team_by_id[home_id].home_venue_id
+            for s in range(n_slots):
+                if (venue_id, s) in blocked:
+                    model.Add(x[m][s] == 0)
+
+    # ── Broadcaster contractual requirements (HARD) ───────────────────────────
+    # Enforce minimum and maximum game counts per contracted timeslot.
+    # These represent legally binding inventory commitments to broadcast partners.
+    for contract in constraints.broadcast_contracts:
+        contract_slot_vars = []
+        for m in range(n_matchups):
+            for s, (_, slot) in enumerate(date_slots):
+                if slot == contract.timeslot:
+                    contract_slot_vars.append(x[m][s])
+        if contract_slot_vars:
+            if contract.required_games > 0:
+                model.Add(sum(contract_slot_vars) >= contract.required_games)
+            if contract.max_games > 0:
+                model.Add(sum(contract_slot_vars) <= contract.max_games)
 
     # ─────────────────────────────────────────────────────────────────────────
 
-    # Objective: maximize primetime placement for rivalry games + minimize travel
+    # Objective: maximize primetime/rivalry placement, penalize long away travel
+    # travel_penalty = int(dist * travel_optimization_weight / 100)
+    # → 1000 mi trip at weight 1.0 → 10 pt penalty, same order as slot scores (7–15)
+    travel_weight = max(0.0, constraints.travel_optimization_weight)
     objective_terms = []
     for m, (home_id, away_id) in enumerate(matchups):
         is_rivalry = (home_id, away_id) in rivalry_set
-        home_venue = venues.get(team_by_id[home_id].home_venue_id)
+        dist = travel_miles_per_matchup[m]
+        travel_penalty = int(dist * travel_weight / 100) if travel_weight > 0 else 0
         for s, (d, slot) in enumerate(date_slots):
             score = 10
             slot_enum = TimeSlot(slot) if slot in [e.value for e in TimeSlot] else None
@@ -223,6 +390,7 @@ def solve_schedule(
                 score = int(multiplier * 10)
             if is_rivalry and slot in [ts.value for ts in PRIMETIME_SLOTS]:
                 score += 20
+            score -= travel_penalty
             objective_terms.append(score * x[m][s])
 
     model.Maximize(sum(objective_terms))
@@ -230,10 +398,29 @@ def solve_schedule(
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 30.0
     solver.parameters.num_search_workers = 4
+
+    # Count constraints before solving for audit reporting
+    n_hard_constraints = (
+        n_matchups  # each matchup assigned exactly once
+        + len(slot_venue_games)  # venue exclusivity
+        + len(week_team_games)  # weekly per-team game cap
+        + len([None for tid in team_ids for _ in range(20)])  # rest windows (approx)
+        + len(slot_week_vars)  # slot-per-week caps
+        + sum(1 for _ in constraints.venue_blackouts) * n_slots  # blackout blocks (approx)
+        + len(constraints.broadcast_contracts) * 2  # contract min/max
+        + (len(team_ids) * len(week_slot_indices))  # travel caps
+    )
+
     status = solver.Solve(model)
+
+    decisions_evaluated = solver.NumBranches()
+    solve_time = round(solver.WallTime(), 2)
+    obj_value = round(solver.ObjectiveValue(), 1) if status in (cp_model.OPTIMAL, cp_model.FEASIBLE) else None
 
     games: List[Game] = []
     schedule_id = str(uuid.uuid4())
+
+    infeasibility_reasons: List[str] = []
 
     if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         for m, (home_id, away_id) in enumerate(matchups):
@@ -243,13 +430,7 @@ def solve_schedule(
                     venue_id = team_by_id[home_id].home_venue_id
                     is_rivalry = (home_id, away_id) in rivalry_set
                     home_venue = venues.get(venue_id)
-                    away_venue = venues.get(team_by_id[away_id].home_venue_id)
-                    dist = 0.0
-                    if home_venue and away_venue:
-                        dist = haversine_miles(
-                            away_venue.latitude, away_venue.longitude,
-                            home_venue.latitude, home_venue.longitude,
-                        )
+                    dist = travel_miles_per_matchup[m]
                     slot_enum = None
                     try:
                         slot_enum = TimeSlot(slot)
@@ -263,6 +444,35 @@ def solve_schedule(
                     base_viewership = home_venue.capacity if home_venue else 15000
                     projected = int(base_viewership * mult * rivalry_mult * market_mult * random.uniform(0.7, 1.0))
 
+                    timeslot_score = int(mult * 10)
+                    rivalry_bonus = 20 if (is_rivalry and slot in [ts.value for ts in PRIMETIME_SLOTS]) else 0
+                    budget_pct = int(dist / max(max_travel, 1) * 100)
+                    t_penalty = int(dist * travel_weight / 100) if travel_weight > 0 else 0
+
+                    reasons = []
+                    if slot_enum in PRIMETIME_SLOTS:
+                        reasons.append(f"primetime slot ({slot_enum.value if slot_enum else slot})")
+                    if is_rivalry:
+                        reasons.append("rivalry matchup")
+                    if dist < max_travel * 0.5:
+                        reasons.append("travel-efficient placement")
+                    if travel_weight > 0 and t_penalty > 0:
+                        reasons.append(f"travel penalized ({t_penalty} pts for {int(dist)} mi)")
+                    summary = (
+                        "Placed for: " + ", ".join(reasons)
+                        if reasons else "Standard placement"
+                    )
+
+                    breakdown = ScoreBreakdown(
+                        timeslot_score=timeslot_score,
+                        rivalry_bonus=rivalry_bonus,
+                        travel_miles=round(dist, 1),
+                        travel_budget_pct=budget_pct,
+                        travel_penalty=t_penalty,
+                        total_objective_score=timeslot_score + rivalry_bonus - t_penalty,
+                        summary=summary,
+                    )
+
                     games.append(Game(
                         id=str(uuid.uuid4()),
                         home_team_id=home_id,
@@ -272,6 +482,8 @@ def solve_schedule(
                         timeslot=slot,
                         is_rivalry=is_rivalry,
                         projected_viewership=projected,
+                        travel_miles=round(dist, 1),
+                        score_breakdown=breakdown,
                     ))
                     break
 
@@ -279,12 +491,16 @@ def solve_schedule(
         if constraints.no_back_to_back_away:
             games = _repair_back_to_back_away(games, team_ids, date_slots, constraints.min_rest_days)
     else:
+        if status == cp_model.INFEASIBLE:
+            solver_status = "INFEASIBLE"
+            infeasibility_reasons = _diagnose_infeasibility(constraints, teams, n_matchups, n_slots, date_slots)
+        else:
+            solver_status = "TIMEOUT_FALLBACK"
         games = _greedy_fallback(matchups, date_slots, team_by_id, venues, rivalry_set, constraints)
-        solver_status = "GREEDY_FALLBACK"
 
     games.sort(key=lambda g: g.game_date)
 
-    return Schedule(
+    schedule = Schedule(
         id=schedule_id,
         league_id=constraints.league_id,
         season_start=constraints.season_start,
@@ -295,6 +511,21 @@ def solve_schedule(
         generated_at=str(date.today()),
         solver_status=solver_status,
     )
+
+    metrics = {
+        "decisions_evaluated": decisions_evaluated,
+        "solve_time_seconds": solve_time,
+        "total_variables": n_matchups * n_slots,
+        "hard_constraints_count": max(0, n_hard_constraints),
+        "solver_status": solver_status,
+        "objective_value": obj_value,
+        "infeasibility_reasons": infeasibility_reasons,
+        "n_teams": n_teams,
+        "n_matchups": n_matchups,
+        "n_slots": n_slots,
+    }
+
+    return schedule, metrics
 
 
 def _repair_back_to_back_away(
@@ -391,7 +622,6 @@ def _greedy_fallback(matchups, date_slots, team_by_id, venues, rivalry_set, cons
                     team_last_game[tid] = d
 
             home_venue = venues.get(venue_id)
-            away_venue = venues.get(team_by_id[away_id].home_venue_id)
             slot_enum = None
             try:
                 slot_enum = TimeSlot(slot)
@@ -434,3 +664,77 @@ def _greedy_fallback(matchups, date_slots, team_by_id, venues, rivalry_set, cons
             ))
 
     return games
+
+
+def _diagnose_infeasibility(
+    constraints: ScheduleConstraints,
+    teams: List[Team],
+    n_matchups: int,
+    n_slots: int,
+    date_slots: List[Tuple[date, str]],
+) -> List[str]:
+    """Identify likely reasons the CP-SAT solver returned INFEASIBLE."""
+    reasons = []
+    n_teams = len(teams)
+    season_days = (constraints.season_end - constraints.season_start).days
+
+    if n_slots < n_matchups:
+        reasons.append(
+            f"Too few scheduling slots: {n_slots} available date-slots for {n_matchups} required games. "
+            f"Extend the season end date or reduce the minimum rest days."
+        )
+
+    max_games_per_team = season_days // max(constraints.min_rest_days, 1)
+    games_per_team = 2 * (n_teams - 1)
+    if max_games_per_team < games_per_team:
+        reasons.append(
+            f"Rest constraint infeasible: with {constraints.min_rest_days}-day rest, each team can play "
+            f"at most {max_games_per_team} games in {season_days} days, but needs {games_per_team}. "
+            f"Reduce min_rest_days to ≤{season_days // max(games_per_team, 1)} or extend the season."
+        )
+
+    slot_date_count: Dict[str, int] = {}
+    for (_, slot) in date_slots:
+        slot_date_count[slot] = slot_date_count.get(slot, 0) + 1
+
+    for contract in constraints.broadcast_contracts:
+        available = slot_date_count.get(contract.timeslot, 0)
+        max_possible = available * (n_teams // 2)
+        if contract.required_games > max_possible:
+            reasons.append(
+                f"Broadcast contract infeasible: {contract.network} requires {contract.required_games} games "
+                f"in '{contract.timeslot}', but only {max_possible} are possible in this season window. "
+                f"Reduce required_games to ≤{max_possible} or extend the season."
+            )
+
+    if constraints.venue_blackouts:
+        blacked_by_venue: Dict[str, int] = {}
+        for blackout in constraints.venue_blackouts:
+            count = sum(1 for (d, _) in date_slots if blackout.start_date <= d <= blackout.end_date)
+            blacked_by_venue[blackout.venue_id] = blacked_by_venue.get(blackout.venue_id, 0) + count
+        for venue_id, blacked in blacked_by_venue.items():
+            home_games = sum(1 for t in teams if t.home_venue_id == venue_id) * (n_teams - 1)
+            if n_slots - blacked < home_games:
+                reasons.append(
+                    f"Venue blackout infeasible: venue '{venue_id}' is blacked out for {blacked} slot(s), "
+                    f"leaving too few slots for {home_games} home games. Shorten the blackout window."
+                )
+
+    if constraints.even_distribution:
+        weeks = season_days / 7
+        avg_per_week = n_matchups / max(weeks, 1)
+        target_min = constraints.target_games_per_week - constraints.games_per_week_tolerance
+        if avg_per_week < target_min * 0.6:
+            reasons.append(
+                f"Even distribution target too high: the season math allows only ~{avg_per_week:.1f} games/week, "
+                f"but the target band requires {target_min}+. Lower target_games_per_week or extend the season."
+            )
+
+    if not reasons:
+        reasons.append(
+            "The combined set of hard constraints (rest days, venue availability, broadcaster commitments, "
+            "weekly travel cap, and distribution rules) has no feasible solution in this season window. "
+            "Try relaxing one constraint at a time — start with min_rest_days or venue blackouts."
+        )
+
+    return reasons

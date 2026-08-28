@@ -1,9 +1,14 @@
 import axios from 'axios';
-import type { TravelAnalysis, AudienceAnalysis, TournamentBracket } from '../types';
+import type { TravelAnalysis, AudienceAnalysis, TournamentBracket, BroadcastContract, VenueBlackout, CBAProfile } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({ baseURL: BASE_URL });
+
+export async function getCBAProfiles(): Promise<CBAProfile[]> {
+  const res = await api.get('/schedule/cba-profiles');
+  return res.data;
+}
 
 export async function getLeagues() {
   const res = await api.get('/schedule/leagues');
@@ -32,6 +37,10 @@ export async function generateSchedule(payload: {
   even_distribution: boolean;
   target_games_per_week: number;
   games_per_week_tolerance: number;
+  broadcast_contracts: BroadcastContract[];
+  venue_blackouts: VenueBlackout[];
+  travel_optimization_weight: number;
+  cba_profile_id?: string | null;
 }) {
   const res = await api.post('/schedule/generate', payload);
   return res.data;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Schedule, ValidationResult, ScheduleSummary, NavSection } from './types';
+import type { Schedule, ValidationResult, ScheduleSummary, NavSection, FeasibilityAnalysis, SolverMetrics } from './types';
 import Navbar from './components/Navbar';
 import ConstraintPanel from './components/ConstraintPanel';
 import ScheduleGrid from './components/ScheduleGrid';
@@ -13,6 +13,8 @@ interface AppState {
   schedule: Schedule;
   validation: ValidationResult;
   summary: ScheduleSummary;
+  feasibility_analysis?: FeasibilityAnalysis;
+  solver_metrics?: SolverMetrics;
 }
 
 export default function App() {
@@ -30,6 +32,8 @@ export default function App() {
         schedule: result.schedule,
         validation: result.validation,
         summary: result.summary,
+        feasibility_analysis: result.feasibility_analysis,
+        solver_metrics: result.solver_metrics,
       });
       setActiveSection('schedule');
     } catch (e: any) {
@@ -117,6 +121,8 @@ export default function App() {
               schedule={appState.schedule}
               validation={appState.validation}
               summary={appState.summary}
+              feasibilityAnalysis={appState.feasibility_analysis}
+              solverMetrics={appState.solver_metrics}
             />
           </div>
         );

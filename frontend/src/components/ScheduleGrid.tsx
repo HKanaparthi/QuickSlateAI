@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import type { Game, Schedule, ValidationResult, ScheduleSummary } from '../types';
+import type { Game, Schedule, ValidationResult, ScheduleSummary, FeasibilityAnalysis, SolverMetrics } from '../types';
 import { TEAMS_BY_ID, VENUES_BY_ID } from '../data/teams';
 import GameCard from './GameCard';
 import { explainGame } from '../utils/api';
@@ -8,9 +8,11 @@ interface ScheduleGridProps {
   schedule: Schedule;
   validation: ValidationResult;
   summary: ScheduleSummary;
+  feasibilityAnalysis?: FeasibilityAnalysis;
+  solverMetrics?: SolverMetrics;
 }
 
-export default function ScheduleGrid({ schedule, validation, summary }: ScheduleGridProps) {
+export default function ScheduleGrid({ schedule, validation, summary, feasibilityAnalysis, solverMetrics }: ScheduleGridProps) {
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [filterTeam, setFilterTeam] = useState('');
   const [viewMode, setViewMode] = useState<'week' | 'list'>('week');
@@ -99,6 +101,105 @@ export default function ScheduleGrid({ schedule, validation, summary }: Schedule
         <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 text-sm text-warning">
           Schedule generated with greedy fallback (OR-Tools timeout). Some constraints may be relaxed.
         </div>
+      )}
+
+      {/* Feasibility / Conflict Analysis */}
+      {feasibilityAnalysis && (feasibilityAnalysis.issues.length > 0 || feasibilityAnalysis.warnings.length > 0) && (
+        <div className="card border-warning/30">
+          <h3 className="text-sm font-semibold text-warning mb-3">Constraint Analysis</h3>
+          {feasibilityAnalysis.issues.map((issue, i) => (
+            <div key={i} className="mb-2 p-3 bg-danger/10 border border-danger/20 rounded-lg">
+              <div className="flex items-start gap-2">
+                <span className="text-danger text-sm mt-0.5">●</span>
+                <div>
+                  <p className="text-sm text-white">{issue.message}</p>
+                  {issue.suggestion && (
+                    <p className="text-xs text-dark-500 mt-1">Suggestion: {issue.suggestion}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+          {feasibilityAnalysis.warnings.map((w, i) => (
+            <div key={i} className="mb-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+              <div className="flex items-start gap-2">
+                <span className="text-warning text-sm mt-0.5">▲</span>
+                <p className="text-sm text-dark-400">{w}</p>
+              </div>
+            </div>
+          ))}
+          <div className="mt-3 pt-3 border-t border-dark-700 grid grid-cols-3 gap-3 text-center text-xs text-dark-500">
+            <div><span className="block text-white font-mono text-lg">{feasibilityAnalysis.total_games}</span>total games</div>
+            <div><span className="block text-white font-mono text-lg">{feasibilityAnalysis.available_slots}</span>available slots</div>
+            <div><span className="block text-white font-mono text-lg">{feasibilityAnalysis.games_per_team}</span>games/team</div>
+          </div>
+        </div>
+      )}
+
+      {/* Broadcast Compliance */}
+      {validation.broadcast_compliance && validation.broadcast_compliance.length > 0 && (
+        <div className="card">
+          <h3 className="text-sm font-semibold text-white mb-3">Broadcast Compliance</h3>
+          <div className="space-y-2">
+            {validation.broadcast_compliance.map((item, i) => (
+              <div key={i} className="flex items-center justify-between py-2 border-b border-dark-700 last:border-0">
+                <div className="flex items-center gap-3">
+                  <span className={[
+                    'w-2 h-2 rounded-full flex-shrink-0',
+                    item.status === 'OK' ? 'bg-success' : item.status === 'OVER' ? 'bg-warning' : 'bg-danger',
+                  ].join(' ')} />
+                  <div>
+                    <span className="text-sm font-semibold text-white">{item.network}</span>
+                    <span className="ml-2 text-xs text-dark-500">{item.timeslot}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-dark-500">Required: <span className="text-dark-300">{item.required}</span></span>
+                  <span className="text-dark-500">Max: <span className="text-dark-300">{item.max}</span></span>
+                  <span className={[
+                    'font-semibold px-2 py-0.5 rounded',
+                    item.status === 'OK' ? 'text-success bg-success/10' : item.status === 'OVER' ? 'text-warning bg-warning/10' : 'text-danger bg-danger/10',
+                  ].join(' ')}>
+                    {item.actual} {item.status === 'OK' ? '✓' : item.status === 'OVER' ? '▲' : '✗'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Infeasibility Explainer */}
+      {(schedule.solver_status === 'INFEASIBLE' || schedule.solver_status === 'TIMEOUT_FALLBACK') && (
+        <div className="card border-danger/40 bg-danger/5">
+          <h3 className="text-sm font-semibold text-danger mb-3">
+            {schedule.solver_status === 'INFEASIBLE' ? 'Schedule Infeasible — No Valid Solution Found' : 'Solver Timeout — Greedy Fallback Applied'}
+          </h3>
+          <p className="text-xs text-dark-500 mb-3">
+            {schedule.solver_status === 'INFEASIBLE'
+              ? 'OR-Tools CP-SAT proved no schedule satisfies all hard constraints simultaneously. The greedy fallback below violates some constraints. Diagnosis:'
+              : 'The solver hit its 30-second time limit before finding an optimal solution. The greedy fallback may not satisfy all constraints.'}
+          </p>
+          {solverMetrics?.infeasibility_reasons && solverMetrics.infeasibility_reasons.length > 0 && (
+            <div className="space-y-2 mb-4">
+              {solverMetrics.infeasibility_reasons.map((reason, i) => (
+                <div key={i} className="flex items-start gap-2 p-3 bg-danger/10 border border-danger/20 rounded-lg">
+                  <span className="text-danger mt-0.5 flex-shrink-0">●</span>
+                  <p className="text-xs text-dark-300">{reason}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="text-xs text-dark-500 p-3 bg-dark-700/60 rounded-lg">
+            <span className="text-warning font-semibold">Possible relaxations: </span>
+            Reduce min_rest_days · Extend season end date · Lower broadcaster required_games · Shorten venue blackout windows · Lower target_games_per_week
+          </div>
+        </div>
+      )}
+
+      {/* Constraint Audit Panel */}
+      {solverMetrics && schedule.solver_status !== 'GREEDY_FALLBACK' && (
+        <ConstraintAuditPanel metrics={solverMetrics} />
       )}
 
       {/* Content */}
@@ -259,6 +360,105 @@ function StatCard({ label, value, icon }: { label: string; value: number; icon: 
       <div>
         <p className="text-xs text-dark-600">{label}</p>
         <p className="font-bold text-white text-xl">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function ConstraintAuditPanel({ metrics }: { metrics: SolverMetrics }) {
+  const isOptimal = metrics.solver_status === 'OPTIMAL';
+  const isFeasible = metrics.solver_status === 'FEASIBLE';
+  const solved = isOptimal || isFeasible;
+
+  const auditRows = [
+    {
+      label: 'Hard constraints satisfied',
+      value: solved ? `All ${metrics.hard_constraints_count.toLocaleString()}` : 'Not all',
+      pass: solved,
+      detail: `${metrics.n_matchups} matchups × ${metrics.n_slots} slots`,
+    },
+    {
+      label: 'Venue conflicts',
+      value: metrics.venue_conflicts === 0 ? '0 ✓' : `${metrics.venue_conflicts} violations`,
+      pass: metrics.venue_conflicts === 0,
+      detail: 'No double-booked venue/timeslot pairs',
+    },
+    {
+      label: 'Rest day violations',
+      value: metrics.rest_violations === 0 ? '0 ✓' : `${metrics.rest_violations} violations`,
+      pass: metrics.rest_violations === 0,
+      detail: 'Minimum rest days enforced by solver',
+    },
+    {
+      label: 'Broadcaster commitments',
+      value: metrics.broadcaster_total > 0
+        ? `${metrics.broadcaster_satisfied}/${metrics.broadcaster_total} contracts ✓`
+        : 'No contracts configured',
+      pass: metrics.broadcaster_total === 0 || metrics.broadcaster_satisfied === metrics.broadcaster_total,
+      detail: 'Required game counts per timeslot',
+    },
+    {
+      label: 'Home/away imbalance teams',
+      value: metrics.home_away_imbalance_count === 0 ? '0 ✓' : `${metrics.home_away_imbalance_count} teams flagged`,
+      pass: metrics.home_away_imbalance_count === 0,
+      detail: '>15% deviation from 50/50 split',
+    },
+    {
+      label: 'Back-to-back away (post-repair)',
+      value: metrics.back_to_back_away_count === 0 ? '0 remaining ✓' : `${metrics.back_to_back_away_count} remaining`,
+      pass: metrics.back_to_back_away_count === 0,
+      detail: 'Greedy repair pass applied after solve',
+    },
+  ];
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Constraint Audit</h3>
+          <p className="text-xs text-dark-600 mt-0.5">
+            {metrics.cba_profile_applied ? `CBA Profile: ${metrics.cba_profile_applied} · ` : ''}
+            OR-Tools CP-SAT · Status: <span className={isOptimal ? 'text-success' : isFeasible ? 'text-warning' : 'text-danger'}>{metrics.solver_status}</span>
+          </p>
+        </div>
+        <div className="text-right text-xs text-dark-600">
+          <div className="font-mono text-white">{metrics.decisions_evaluated.toLocaleString()}</div>
+          <div>decisions evaluated</div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {auditRows.map((row, i) => (
+          <div key={i} className="flex items-center justify-between py-2 border-b border-dark-700 last:border-0">
+            <div className="flex items-center gap-2">
+              <span className={row.pass ? 'text-success' : 'text-warning'}>
+                {row.pass ? '✓' : '~'}
+              </span>
+              <div>
+                <span className="text-sm text-dark-300">{row.label}</span>
+                <span className="text-xs text-dark-600 ml-2 hidden sm:inline">{row.detail}</span>
+              </div>
+            </div>
+            <span className={`text-xs font-mono font-semibold ${row.pass ? 'text-success' : 'text-warning'}`}>
+              {row.value}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 pt-3 border-t border-dark-700 grid grid-cols-3 gap-3 text-center text-xs text-dark-500">
+        <div>
+          <span className="block text-white font-mono">{metrics.solve_time_seconds}s</span>
+          solve time
+        </div>
+        <div>
+          <span className="block text-white font-mono">{metrics.total_variables.toLocaleString()}</span>
+          decision variables
+        </div>
+        <div>
+          <span className="block text-white font-mono">{metrics.objective_value?.toLocaleString() ?? '—'}</span>
+          objective score
+        </div>
       </div>
     </div>
   );

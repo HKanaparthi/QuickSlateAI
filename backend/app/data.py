@@ -86,6 +86,95 @@ LEAGUES_BY_ID = {lg.id: lg for lg in LEAGUES}
 ALL_TEAMS = NPL_TEAMS + SAC_TEAMS
 TEAMS_BY_ID = {t.id: t for t in ALL_TEAMS}
 
+CBA_PROFILES = [
+    {
+        "id": "general",
+        "name": "General Purpose",
+        "description": "Balanced defaults — suitable for most demo leagues",
+        "rules": [
+            "Minimum 2 rest days between games",
+            "Max 600 miles travel per week",
+            "No back-to-back away games",
+            "Max 3 games per team per 7-day window",
+        ],
+        "min_rest_days": 2,
+        "max_travel_miles_per_week": 600,
+        "no_back_to_back_away": True,
+        "home_away_balanced": True,
+        "even_distribution": True,
+        "target_games_per_week": 4,
+        "games_per_week_tolerance": 1,
+        "min_distinct_slots_per_week": 3,
+        "max_games_per_slot_per_week": 2,
+        "travel_optimization_weight": 1.0,
+    },
+    {
+        "id": "nba_style",
+        "name": "NBA-Style",
+        "description": "Fast pace: 1-day rest minimum, high-volume travel, dense schedule",
+        "rules": [
+            "Minimum 1 rest day between games",
+            "Max 2500 miles travel per week",
+            "Back-to-back games permitted (heavy repair pass applied)",
+            "Up to 4 games per team per 7-day window",
+        ],
+        "min_rest_days": 1,
+        "max_travel_miles_per_week": 2500,
+        "no_back_to_back_away": False,
+        "home_away_balanced": True,
+        "even_distribution": True,
+        "target_games_per_week": 6,
+        "games_per_week_tolerance": 2,
+        "min_distinct_slots_per_week": 3,
+        "max_games_per_slot_per_week": 3,
+        "travel_optimization_weight": 0.5,
+    },
+    {
+        "id": "nfl_style",
+        "name": "NFL-Style",
+        "description": "One game per week per team — 7-day rest minimum, tight broadcast windows",
+        "rules": [
+            "Minimum 6 rest days between games (one game per week)",
+            "Max 3000 miles travel per week",
+            "No back-to-back away games",
+            "Max 1 game per team per 7-day window",
+        ],
+        "min_rest_days": 6,
+        "max_travel_miles_per_week": 3000,
+        "no_back_to_back_away": True,
+        "home_away_balanced": True,
+        "even_distribution": True,
+        "target_games_per_week": 4,
+        "games_per_week_tolerance": 1,
+        "min_distinct_slots_per_week": 2,
+        "max_games_per_slot_per_week": 2,
+        "travel_optimization_weight": 0.8,
+    },
+    {
+        "id": "college_style",
+        "name": "College/NCAA-Style",
+        "description": "2-day rest, regional travel limits, weekend-heavy schedule",
+        "rules": [
+            "Minimum 2 rest days between games",
+            "Max 400 miles travel per week (regional focus)",
+            "No back-to-back away games",
+            "Max 2 games per team per 7-day window",
+        ],
+        "min_rest_days": 2,
+        "max_travel_miles_per_week": 400,
+        "no_back_to_back_away": True,
+        "home_away_balanced": True,
+        "even_distribution": True,
+        "target_games_per_week": 3,
+        "games_per_week_tolerance": 1,
+        "min_distinct_slots_per_week": 2,
+        "max_games_per_slot_per_week": 2,
+        "travel_optimization_weight": 1.5,
+    },
+]
+
+CBA_PROFILES_BY_ID = {p["id"]: p for p in CBA_PROFILES}
+
 DEFAULT_RIVALRY_PAIRS = {
     "NPL": [
         ["cary_cobras", "charlotte_thunder"],

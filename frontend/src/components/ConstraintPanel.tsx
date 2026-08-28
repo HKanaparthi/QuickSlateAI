@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { LEAGUES, DEFAULT_RIVALRY_PAIRS, NPL_TEAMS, SAC_TEAMS } from '../data/teams';
-import type { Team } from '../types';
+import { useState, useMemo, useEffect } from 'react';
+import { LEAGUES, DEFAULT_RIVALRY_PAIRS, NPL_TEAMS, SAC_TEAMS, VENUES } from '../data/teams';
+import type { BroadcastContract, VenueBlackout, CBAProfile } from '../types';
+import { getCBAProfiles } from '../utils/api';
 
 interface ConstraintPanelProps {
   onGenerate: (params: {
@@ -20,6 +21,10 @@ interface ConstraintPanelProps {
     even_distribution: boolean;
     target_games_per_week: number;
     games_per_week_tolerance: number;
+    broadcast_contracts: BroadcastContract[];
+    venue_blackouts: VenueBlackout[];
+    travel_optimization_weight: number;
+    cba_profile_id: string | null;
   }) => void;
   isLoading: boolean;
 }
@@ -34,7 +39,41 @@ const TIMESLOTS = [
   { id: 'Thursday 7:00 PM', label: 'Thu 7:00 PM' },
 ];
 
+const TIMESLOT_OPTIONS = [
+  'Saturday 8:00 PM',
+  'Sunday 4:00 PM',
+  'Friday 7:00 PM',
+  'Monday 7:00 PM',
+  'Tuesday 6:00 PM',
+  'Wednesday 7:00 PM',
+  'Thursday 7:00 PM',
+];
+
 export default function ConstraintPanel({ onGenerate, isLoading }: ConstraintPanelProps) {
+  const [cbaProfiles, setCbaProfiles] = useState<CBAProfile[]>([]);
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+
+  useEffect(() => {
+    getCBAProfiles().then(setCbaProfiles).catch(() => {});
+  }, []);
+
+  const applyProfile = (profileId: string | null) => {
+    setSelectedProfileId(profileId);
+    if (!profileId) return;
+    const profile = cbaProfiles.find(p => p.id === profileId);
+    if (!profile) return;
+    setMinRestDays(profile.min_rest_days);
+    setMaxTravelMiles(profile.max_travel_miles_per_week);
+    setNoBackToBackAway(profile.no_back_to_back_away);
+    setHomeAwayBalanced(profile.home_away_balanced);
+    setEvenDistribution(profile.even_distribution);
+    setTargetGamesPerWeek(profile.target_games_per_week);
+    setGamesPerWeekTolerance(profile.games_per_week_tolerance);
+    setMinDistinctSlotsPerWeek(profile.min_distinct_slots_per_week);
+    setMaxGamesPerSlotPerWeek(profile.max_games_per_slot_per_week);
+    setTravelOptWeight(profile.travel_optimization_weight);
+  };
+
   const [leagueId, setLeagueId] = useState('NPL');
   const [seasonStart, setSeasonStart] = useState('2026-10-01');
   const [seasonEnd, setSeasonEnd] = useState('2027-04-30');
@@ -53,8 +92,51 @@ export default function ConstraintPanel({ onGenerate, isLoading }: ConstraintPan
   const [evenDistribution, setEvenDistribution] = useState(true);
   const [targetGamesPerWeek, setTargetGamesPerWeek] = useState(4);
   const [gamesPerWeekTolerance, setGamesPerWeekTolerance] = useState(1);
+  const [broadcastContracts, setBroadcastContracts] = useState<BroadcastContract[]>([]);
+  const [venueBlackouts, setVenueBlackouts] = useState<VenueBlackout[]>([]);
+  const [newBlackoutVenueId, setNewBlackoutVenueId] = useState('');
+  const [newBlackoutStart, setNewBlackoutStart] = useState('');
+  const [newBlackoutEnd, setNewBlackoutEnd] = useState('');
+  const [newBlackoutReason, setNewBlackoutReason] = useState('');
+  const [travelOptWeight, setTravelOptWeight] = useState(1.0);
+  const [showConstraintArch, setShowConstraintArch] = useState(false);
 
   const currentTeams = leagueId === 'NPL' ? NPL_TEAMS : SAC_TEAMS;
+  const currentVenues = useMemo(() => {
+    const ids = new Set(currentTeams.map(t => t.home_venue_id));
+    return VENUES.filter(v => ids.has(v.id));
+  }, [currentTeams]);
+
+  const addBroadcastContract = () => {
+    setBroadcastContracts(prev => [
+      ...prev,
+      { network: 'ESPN', timeslot: 'Saturday 8:00 PM', required_games: 6, max_games: 10, rivalry_priority: false },
+    ]);
+  };
+
+  const removeBroadcastContract = (i: number) => {
+    setBroadcastContracts(prev => prev.filter((_, j) => j !== i));
+  };
+
+  const updateBroadcastContract = (i: number, field: keyof BroadcastContract, value: string | number | boolean) => {
+    setBroadcastContracts(prev => prev.map((c, j) => j === i ? { ...c, [field]: value } : c));
+  };
+
+  const addVenueBlackout = () => {
+    if (!newBlackoutVenueId || !newBlackoutStart || !newBlackoutEnd) return;
+    if (newBlackoutEnd < newBlackoutStart) return;
+    setVenueBlackouts(prev => [
+      ...prev,
+      { venue_id: newBlackoutVenueId, start_date: newBlackoutStart, end_date: newBlackoutEnd, reason: newBlackoutReason },
+    ]);
+    setNewBlackoutStart('');
+    setNewBlackoutEnd('');
+    setNewBlackoutReason('');
+  };
+
+  const removeVenueBlackout = (i: number) => {
+    setVenueBlackouts(prev => prev.filter((_, j) => j !== i));
+  };
 
   const toggleSlot = (slot: string) => {
     setSelectedSlots(prev =>
@@ -93,6 +175,10 @@ export default function ConstraintPanel({ onGenerate, isLoading }: ConstraintPan
       even_distribution: evenDistribution,
       target_games_per_week: targetGamesPerWeek,
       games_per_week_tolerance: gamesPerWeekTolerance,
+      broadcast_contracts: broadcastContracts,
+      venue_blackouts: venueBlackouts,
+      travel_optimization_weight: travelOptWeight,
+      cba_profile_id: selectedProfileId,
     });
   };
 
@@ -148,6 +234,71 @@ export default function ConstraintPanel({ onGenerate, isLoading }: ConstraintPan
         </div>
       </div>
 
+      {/* CBA Rule Profiles */}
+      {cbaProfiles.length > 0 && (
+        <div className="card">
+          <div className="mb-3">
+            <h3 className="section-title mb-0">CBA Rule Profile</h3>
+            <p className="text-xs text-dark-600 mt-0.5">
+              Apply a pre-configured league rule profile — auto-fills rest, travel, and distribution constraints below.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 mb-3">
+            <button
+              type="button"
+              onClick={() => applyProfile(null)}
+              className={[
+                'py-2 px-3 rounded-lg border text-xs font-medium transition-all text-left',
+                selectedProfileId === null
+                  ? 'bg-dark-600 border-dark-500 text-white'
+                  : 'border-dark-700 text-dark-600 hover:border-dark-500 hover:text-dark-400',
+              ].join(' ')}
+            >
+              <div className="font-semibold">Custom</div>
+              <div className="opacity-75 mt-0.5">Manual settings</div>
+            </button>
+            {cbaProfiles.map(profile => (
+              <button
+                key={profile.id}
+                type="button"
+                onClick={() => applyProfile(profile.id)}
+                className={[
+                  'py-2 px-3 rounded-lg border text-xs font-medium transition-all text-left',
+                  selectedProfileId === profile.id
+                    ? 'bg-primary-600/20 border-primary-600 text-white'
+                    : 'border-dark-700 text-dark-600 hover:border-dark-500 hover:text-dark-400',
+                ].join(' ')}
+              >
+                <div className="font-semibold">{profile.name}</div>
+                <div className="opacity-75 mt-0.5 line-clamp-1">{profile.description}</div>
+              </button>
+            ))}
+          </div>
+          {selectedProfileId && (() => {
+            const profile = cbaProfiles.find(p => p.id === selectedProfileId);
+            if (!profile) return null;
+            return (
+              <div className="bg-dark-700/60 rounded-lg p-3 border border-primary-600/20">
+                <div className="text-xs font-semibold text-primary-400 mb-2">
+                  {profile.name} — Active Rules
+                </div>
+                <ul className="space-y-1">
+                  {profile.rules.map((rule, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-dark-400">
+                      <span className="text-success mt-0.5 flex-shrink-0">✓</span>
+                      {rule}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-dark-600 mt-2">
+                  Constraint sliders below have been updated to match this profile. You can still adjust them further.
+                </p>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Constraint Sliders */}
       <div className="card">
         <h3 className="section-title">Scheduling Constraints</h3>
@@ -180,6 +331,24 @@ export default function ConstraintPanel({ onGenerate, isLoading }: ConstraintPan
             </div>
           </div>
         </div>
+
+          <div>
+            <label className="label">
+              Travel Optimization Weight: <span className="text-primary-500 font-bold">{travelOptWeight.toFixed(1)}</span>
+            </label>
+            <input
+              type="range" min={0} max={2} step={0.1} value={travelOptWeight}
+              onChange={e => setTravelOptWeight(+e.target.value)}
+              className="w-full accent-primary-600"
+            />
+            <div className="flex justify-between text-xs text-dark-600 mt-1">
+              <span>0 (ignore)</span><span>2.0 (strongly minimize)</span>
+            </div>
+            <p className="text-xs text-dark-600 mt-1">
+              Subtracts travel cost from the objective — optimizer actively routes shorter trips into better timeslots.
+              At 1.0: a 1,000 mi trip costs ~10 objective pts (same scale as a timeslot score).
+            </p>
+          </div>
 
         <div className="mt-4 flex flex-wrap gap-4">
           <Toggle label="Home/Away Balanced" value={homeAwayBalanced} onChange={setHomeAwayBalanced} />
@@ -297,6 +466,223 @@ export default function ConstraintPanel({ onGenerate, isLoading }: ConstraintPan
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Broadcast Contracts */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="section-title mb-0">Broadcast Contracts</h3>
+            <p className="text-xs text-dark-600 mt-0.5">
+              Legally binding inventory commitments — solver enforces these as hard constraints.
+            </p>
+          </div>
+          <button type="button" onClick={addBroadcastContract} className="btn-secondary text-xs px-3 py-1.5">
+            + Add Contract
+          </button>
+        </div>
+
+        {broadcastContracts.length === 0 && (
+          <div className="text-xs text-dark-600 py-3 text-center border border-dashed border-dark-700 rounded-lg">
+            No broadcaster contracts configured — add one to enforce minimum game commitments per timeslot.
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {broadcastContracts.map((contract, i) => (
+            <div key={i} className="bg-dark-700/60 rounded-lg p-3 border border-dark-600">
+              <div className="flex items-center justify-between mb-2.5">
+                <input
+                  type="text"
+                  value={contract.network}
+                  onChange={e => updateBroadcastContract(i, 'network', e.target.value)}
+                  placeholder="Network (ESPN, FOX…)"
+                  className="input text-sm font-semibold w-32"
+                />
+                <button type="button" onClick={() => removeBroadcastContract(i)} className="text-danger text-xs hover:opacity-75">
+                  Remove
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="label text-xs">Timeslot</label>
+                  <select
+                    value={contract.timeslot}
+                    onChange={e => updateBroadcastContract(i, 'timeslot', e.target.value)}
+                    className="input text-xs w-full"
+                  >
+                    {TIMESLOT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label text-xs">Required</label>
+                  <input
+                    type="number" min={0} max={30}
+                    value={contract.required_games}
+                    onChange={e => updateBroadcastContract(i, 'required_games', +e.target.value)}
+                    className="input text-sm w-full"
+                  />
+                </div>
+                <div>
+                  <label className="label text-xs">Max</label>
+                  <input
+                    type="number" min={0} max={50}
+                    value={contract.max_games}
+                    onChange={e => updateBroadcastContract(i, 'max_games', +e.target.value)}
+                    className="input text-sm w-full"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Venue Availability */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="section-title mb-0">Venue Availability</h3>
+            <p className="text-xs text-dark-600 mt-0.5">
+              Block venues during concerts, renovations, or conflicting events — solver will not schedule games during these windows.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 mb-3 sm:grid-cols-4">
+          <div>
+            <label className="label text-xs">Venue</label>
+            <select
+              value={newBlackoutVenueId}
+              onChange={e => setNewBlackoutVenueId(e.target.value)}
+              className="input text-xs w-full"
+            >
+              <option value="">Select venue…</option>
+              {currentVenues.map(v => (
+                <option key={v.id} value={v.id}>{v.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label text-xs">From</label>
+            <input
+              type="date"
+              value={newBlackoutStart}
+              onChange={e => setNewBlackoutStart(e.target.value)}
+              className="input text-xs w-full"
+            />
+          </div>
+          <div>
+            <label className="label text-xs">To</label>
+            <input
+              type="date"
+              value={newBlackoutEnd}
+              onChange={e => setNewBlackoutEnd(e.target.value)}
+              className="input text-xs w-full"
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={addVenueBlackout}
+              disabled={!newBlackoutVenueId || !newBlackoutStart || !newBlackoutEnd}
+              className="btn-secondary text-xs px-3 py-2 w-full disabled:opacity-40"
+            >
+              + Block
+            </button>
+          </div>
+        </div>
+
+        {newBlackoutVenueId && newBlackoutStart && (
+          <div className="mb-3">
+            <input
+              type="text"
+              value={newBlackoutReason}
+              onChange={e => setNewBlackoutReason(e.target.value)}
+              placeholder="Reason (optional — e.g. Concert series, Renovation)"
+              className="input text-xs w-full"
+            />
+          </div>
+        )}
+
+        {venueBlackouts.length === 0 ? (
+          <div className="text-xs text-dark-600 py-3 text-center border border-dashed border-dark-700 rounded-lg">
+            No venue blackouts configured — all venues are available for the full season.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {venueBlackouts.map((b, i) => {
+              const venue = currentVenues.find(v => v.id === b.venue_id);
+              return (
+                <div key={i} className="flex items-center justify-between bg-dark-700/60 rounded-lg px-3 py-2 text-xs border border-dark-600">
+                  <div>
+                    <span className="font-medium text-white">{venue?.name ?? b.venue_id}</span>
+                    <span className="text-dark-500 mx-2">·</span>
+                    <span className="text-dark-400">{b.start_date} → {b.end_date}</span>
+                    {b.reason && <span className="text-dark-600 ml-2">({b.reason})</span>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeVenueBlackout(i)}
+                    className="text-danger hover:opacity-75 ml-3"
+                  >
+                    Remove
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Constraint Architecture */}
+      <div className="card">
+        <button
+          type="button"
+          onClick={() => setShowConstraintArch(v => !v)}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <div>
+            <h3 className="section-title mb-0">Constraint Architecture</h3>
+            <p className="text-xs text-dark-600 mt-0.5">How the optimizer classifies and enforces constraints</p>
+          </div>
+          <span className="text-dark-500 text-sm">{showConstraintArch ? '▲' : '▼'}</span>
+        </button>
+
+        {showConstraintArch && (
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 rounded-full bg-danger" />
+                <span className="text-xs font-semibold text-white uppercase tracking-wide">Hard Constraints</span>
+                <span className="text-xs text-dark-600">(solver MUST satisfy)</span>
+              </div>
+              <ul className="space-y-1.5 text-xs text-dark-400">
+                <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>Venue exclusivity — one game per venue per slot</li>
+                <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>Minimum rest days between games</li>
+                <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>Weekly travel cap — max miles per team per week</li>
+                <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>Broadcaster commitments — required game counts per timeslot</li>
+                <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>Venue availability — blackout windows fully blocked from solver</li>
+                <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>Weekly game-volume band — no feast-or-famine weeks</li>
+                <li className="flex items-start gap-2"><span className="text-success mt-0.5">✓</span>Season spacing — games every 1–2 weeks, never 3 consecutive idle</li>
+              </ul>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 rounded-full bg-warning" />
+                <span className="text-xs font-semibold text-white uppercase tracking-wide">Soft Constraints</span>
+                <span className="text-xs text-dark-600">(optimizer targets)</span>
+              </div>
+              <ul className="space-y-1.5 text-xs text-dark-400">
+                <li className="flex items-start gap-2"><span className="text-primary-500 mt-0.5">→</span>Primetime placement for rivalry games (+20 score bonus)</li>
+                <li className="flex items-start gap-2"><span className="text-primary-500 mt-0.5">→</span>Travel minimization — long away trips penalized in objective</li>
+                <li className="flex items-start gap-2"><span className="text-primary-500 mt-0.5">→</span>Viewership maximization via slot multipliers</li>
+                <li className="flex items-start gap-2"><span className="text-warning mt-0.5">~</span>Home/away balance — post-solve validation (yellow warning)</li>
+                <li className="flex items-start gap-2"><span className="text-warning mt-0.5">~</span>Back-to-back away repair — greedy post-solve pass</li>
+              </ul>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Rivalry Games */}

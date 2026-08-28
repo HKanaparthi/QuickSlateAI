@@ -25,6 +25,31 @@ export interface League {
   teams: Team[];
 }
 
+export interface BroadcastContract {
+  network: string;
+  timeslot: string;
+  required_games: number;
+  max_games: number;
+  rivalry_priority: boolean;
+}
+
+export interface VenueBlackout {
+  venue_id: string;
+  start_date: string;
+  end_date: string;
+  reason: string;
+}
+
+export interface ScoreBreakdown {
+  timeslot_score: number;
+  rivalry_bonus: number;
+  travel_miles: number;
+  travel_budget_pct: number;
+  travel_penalty: number;
+  total_objective_score: number;
+  summary: string;
+}
+
 export interface Game {
   id: string;
   home_team_id: string;
@@ -35,6 +60,8 @@ export interface Game {
   is_rivalry: boolean;
   ai_explanation: string | null;
   projected_viewership: number | null;
+  travel_miles?: number;
+  score_breakdown?: ScoreBreakdown;
 }
 
 export interface ScheduleConstraints {
@@ -48,6 +75,7 @@ export interface ScheduleConstraints {
   home_away_balanced: boolean;
   no_back_to_back_away: boolean;
   weather_constraint: boolean;
+  broadcast_contracts: BroadcastContract[];
 }
 
 export interface Schedule {
@@ -73,11 +101,39 @@ export interface Violation {
   game_ids?: string[];
 }
 
+export interface BroadcastComplianceItem {
+  network: string;
+  timeslot: string;
+  required: number;
+  max: number;
+  actual: number;
+  status: 'OK' | 'UNDER' | 'OVER';
+}
+
 export interface ValidationResult {
   violations: Violation[];
   red_count: number;
   yellow_count: number;
   status: 'RED' | 'YELLOW' | 'GREEN';
+  broadcast_compliance: BroadcastComplianceItem[];
+}
+
+export interface FeasibilityIssue {
+  type: string;
+  severity: 'hard' | 'soft' | 'warning';
+  message: string;
+  suggestion?: string;
+  network?: string;
+}
+
+export interface FeasibilityAnalysis {
+  is_feasible_estimate: boolean;
+  total_games: number;
+  available_slots: number;
+  season_days: number;
+  games_per_team: number;
+  issues: FeasibilityIssue[];
+  warnings: string[];
 }
 
 export interface ScheduleSummary {
@@ -86,6 +142,7 @@ export interface ScheduleSummary {
   rivalry_games: number;
   primetime_games: number;
   solver_status: string;
+  avg_home_away_imbalance_pct?: number;
 }
 
 export interface TravelLeg {
@@ -201,3 +258,40 @@ export interface TournamentBracket {
 }
 
 export type NavSection = 'schedule' | 'conflicts' | 'travel' | 'audience' | 'tournament';
+
+export interface CBAProfile {
+  id: string;
+  name: string;
+  description: string;
+  rules: string[];
+  min_rest_days: number;
+  max_travel_miles_per_week: number;
+  no_back_to_back_away: boolean;
+  home_away_balanced: boolean;
+  even_distribution: boolean;
+  target_games_per_week: number;
+  games_per_week_tolerance: number;
+  min_distinct_slots_per_week: number;
+  max_games_per_slot_per_week: number;
+  travel_optimization_weight: number;
+}
+
+export interface SolverMetrics {
+  decisions_evaluated: number;
+  solve_time_seconds: number;
+  total_variables: number;
+  hard_constraints_count: number;
+  solver_status: string;
+  objective_value: number | null;
+  infeasibility_reasons: string[];
+  n_teams: number;
+  n_matchups: number;
+  n_slots: number;
+  venue_conflicts: number;
+  rest_violations: number;
+  back_to_back_away_count: number;
+  home_away_imbalance_count: number;
+  broadcaster_satisfied: number;
+  broadcaster_total: number;
+  cba_profile_applied: string | null;
+}
