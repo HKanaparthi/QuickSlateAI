@@ -1,5 +1,5 @@
+import hashlib
 import uuid
-import random
 from datetime import date, timedelta
 from typing import List, Dict, Tuple, Set, Optional
 from ortools.sat.python import cp_model
@@ -17,6 +17,15 @@ from .models import (
     PRIMETIME_SLOTS,
 )
 from ..data import VENUES_BY_ID
+
+
+def _stable_variation(home_id: str, away_id: str, game_date: date, timeslot: str) -> float:
+    """Deterministic float in [0.7, 1.0] derived from stable inputs via SHA-256.
+    Never uses Python's built-in hash() — output is identical across processes and runs."""
+    seed = f"{home_id}:{away_id}:{game_date.isoformat()}:{timeslot}"
+    digest = hashlib.sha256(seed.encode()).digest()
+    raw = int.from_bytes(digest[:4], "big") / 0xFFFFFFFF
+    return 0.7 + raw * 0.3
 
 
 DAY_TO_SLOTS: Dict[int, List[str]] = {
@@ -243,7 +252,7 @@ def solve_schedule(
     for key, vars_list in slot_venue_games.items():
         model.Add(sum(vars_list) <= 1)
 
-    # At most 2 games per team per week
+    # At most 3 games per team per week
     week_team_games: Dict[Tuple[int, str], List] = {}
     for m, (home_id, away_id) in enumerate(matchups):
         for s, (d, _) in enumerate(date_slots):
@@ -289,15 +298,16 @@ def solve_schedule(
             if len(window_vars) > 1:
                 model.Add(sum(window_vars) <= 1)
 
-    # ── No consecutive away games (CP-SAT hard constraint) ───────────────────
-    # For each team T and each pair of dates (d1, d2) within max_gap_days:
-    #   If both have possible away games for T:
-    #     If no game is possible for T between d1 and d2:  away[d1] + away[d2] ≤ 1
-    #     If games are possible between:  away[d1] + away[d2] ≤ 1 + any_between
-    # This is correct because "consecutive" means no game between the two dates.
+    # ── No consecutive away games — exact O(n_dates) carry-forward chain ───────
+    # pwa_k = "was T's most recent actual game before date d_k an away game?"
+    # Threading state chronologically means every gap length is handled correctly
+    # without any window cap or pair enumeration.  Correctness proof sketch:
+    #   • away_vars + pwa_k ≤ 1  prevents T playing away when prev game was away.
+    #   • State update: next_pwa = away_expr if T plays on d, else prev_pwa.
+    #     Encoded with 4 linear inequalities (conditional-equality pattern).
+    #     Validity relies on sum(any_vars) ∈ {0,1} per team per day, guaranteed
+    #     by the rest-days constraint immediately above.
     if constraints.no_back_to_back_away:
-        max_gap_days = max(7, 2 * min_rest + 1)
-
         t_date_away: Dict[str, Dict[date, List]] = {tid: {} for tid in team_ids}
         t_date_any: Dict[str, Dict[date, List]] = {tid: {} for tid in team_ids}
 
@@ -308,23 +318,26 @@ def solve_schedule(
                 t_date_any[away_id].setdefault(d, []).append(x[m][s])
 
         for tid in team_ids:
-            away_dates = sorted(t_date_away[tid].keys())
-            for i, d1 in enumerate(away_dates):
-                vars_d1 = t_date_away[tid][d1]
-                for d2 in away_dates[i + 1:]:
-                    if (d2 - d1).days > max_gap_days:
-                        break
-                    vars_d2 = t_date_away[tid][d2]
-                    between_vars = [
-                        v
-                        for d_mid, vlist in t_date_any[tid].items()
-                        if d1 < d_mid < d2
-                        for v in vlist
-                    ]
-                    if between_vars:
-                        model.Add(sum(vars_d1) + sum(vars_d2) <= 1 + sum(between_vars))
-                    else:
-                        model.Add(sum(vars_d1) + sum(vars_d2) <= 1)
+            all_dates = sorted(t_date_any[tid].keys())
+            prev_pwa = model.NewBoolVar(f"pwa_{tid}_init")
+            model.Add(prev_pwa == 0)
+
+            for k, d in enumerate(all_dates):
+                away_vars = t_date_away[tid].get(d, [])
+                any_vars  = t_date_any[tid].get(d, [])
+
+                if away_vars:
+                    model.Add(sum(away_vars) + prev_pwa <= 1)
+
+                if any_vars:
+                    next_pwa   = model.NewBoolVar(f"pwa_{tid}_{k}")
+                    away_expr  = sum(away_vars) if away_vars else 0
+                    any_expr   = sum(any_vars)
+                    model.Add(next_pwa <= away_expr + 1 - any_expr)
+                    model.Add(next_pwa >= away_expr - 1 + any_expr)
+                    model.Add(next_pwa <= prev_pwa + any_expr)
+                    model.Add(next_pwa >= prev_pwa - any_expr)
+                    prev_pwa = next_pwa
 
     # ── Timeslot distribution & even weekly spread ───────────────────────────
     # Build (week_key, slot) → [vars] and week_key → [vars] indices
@@ -511,7 +524,7 @@ def solve_schedule(
                         team_by_id[home_id].market_size, 1.0
                     )
                     base_viewership = home_venue.capacity if home_venue else 15000
-                    projected = int(base_viewership * mult * rivalry_mult * market_mult * random.uniform(0.7, 1.0))
+                    projected = int(base_viewership * mult * rivalry_mult * market_mult * _stable_variation(home_id, away_id, d, slot))
 
                     timeslot_score = int(mult * 10)
                     rivalry_bonus = 20 if (is_rivalry and slot in [ts.value for ts in PRIMETIME_SLOTS]) else 0
@@ -559,6 +572,23 @@ def solve_schedule(
         solver_status = "OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE"
         if constraints.no_back_to_back_away:
             games = _repair_back_to_back_away(games, team_ids, date_slots, constraints.min_rest_days)
+            # Count residual violations so callers are never silently surprised.
+            b2b_remaining = 0
+            for _tid in team_ids:
+                _tg = sorted(
+                    (gm for gm in games if gm.home_team_id == _tid or gm.away_team_id == _tid),
+                    key=lambda gm: gm.game_date,
+                )
+                b2b_remaining += sum(
+                    1 for _i in range(len(_tg) - 1)
+                    if _tg[_i].away_team_id == _tid and _tg[_i + 1].away_team_id == _tid
+                )
+            if b2b_remaining:
+                infeasibility_reasons.append(
+                    f"{b2b_remaining} back-to-back away violation(s) remain after greedy repair — "
+                    "the solver time limit was reached before the constraint was fully enforced. "
+                    "Try increasing time_limit_seconds."
+                )
     else:
         if status == cp_model.INFEASIBLE:
             solver_status = "INFEASIBLE"
@@ -637,6 +667,43 @@ def _repair_back_to_back_away(
                             continue
                         if any(abs((cand_d - d).days) < min_rest for d in o_other):
                             continue
+                        # Moving hg to cand_d makes opp play away there.
+                        # Reject if that creates a new B2B away for opp.
+                        opp_sorted = sorted(
+                            (gm for gm in games
+                             if gm.id != hg.id
+                             and (gm.home_team_id == opp or gm.away_team_id == opp)),
+                            key=lambda gm: gm.game_date,
+                        )
+                        prev_opp = next(
+                            (gm for gm in reversed(opp_sorted) if gm.game_date < cand_d), None
+                        )
+                        next_opp = next(
+                            (gm for gm in opp_sorted if gm.game_date > cand_d), None
+                        )
+                        if prev_opp and prev_opp.away_team_id == opp:
+                            continue
+                        if next_opp and next_opp.away_team_id == opp:
+                            continue
+                        # Weekly game cap (3/team/week) — moving to a different week
+                        # must not push team_id or opp over the hard limit.
+                        cand_wk = cand_d.isocalendar()[0] * 100 + cand_d.isocalendar()[1]
+                        orig_wk = hg.game_date.isocalendar()[0] * 100 + hg.game_date.isocalendar()[1]
+                        if cand_wk != orig_wk:
+                            cap_ok = True
+                            for _chk in (team_id, opp):
+                                wk_cnt = sum(
+                                    1 for g in games
+                                    if g.id != hg.id
+                                    and (g.home_team_id == _chk or g.away_team_id == _chk)
+                                    and (g.game_date.isocalendar()[0] * 100
+                                         + g.game_date.isocalendar()[1]) == cand_wk
+                                )
+                                if wk_cnt >= 3:
+                                    cap_ok = False
+                                    break
+                            if not cap_ok:
+                                continue
                         slot_set.discard((hg.venue_id, hg.game_date, hg.timeslot))
                         hg.game_date = cand_d
                         hg.timeslot = cand_s
@@ -655,7 +722,7 @@ def _greedy_fallback(matchups, date_slots, team_by_id, venues, rivalry_set, cons
     import random as rnd
     games = []
     used_slots: Dict[Tuple[str, int], bool] = {}
-    team_last_game: Dict[str, date] = {}
+    team_all_dates: Dict[str, Set[date]] = {}
     slot_list = list(enumerate(date_slots))
     rnd.shuffle(slot_list)
 
@@ -677,18 +744,18 @@ def _greedy_fallback(matchups, date_slots, team_by_id, venues, rivalry_set, cons
                 continue
             rest_ok = True
             for tid in [home_id, away_id]:
-                if tid in team_last_game:
-                    gap = abs((d - team_last_game[tid]).days)
-                    if gap < constraints.min_rest_days:
-                        rest_ok = False
-                        break
+                if tid in team_all_dates and any(
+                    abs((d - pd).days) < constraints.min_rest_days
+                    for pd in team_all_dates[tid]
+                ):
+                    rest_ok = False
+                    break
             if not rest_ok:
                 continue
 
             used_slots[venue_slot_key] = True
             for tid in [home_id, away_id]:
-                if tid not in team_last_game or abs((d - team_last_game[tid]).days) > 0:
-                    team_last_game[tid] = d
+                team_all_dates.setdefault(tid, set()).add(d)
 
             home_venue = venues.get(venue_id)
             slot_enum = None
@@ -702,7 +769,7 @@ def _greedy_fallback(matchups, date_slots, team_by_id, venues, rivalry_set, cons
                 team_by_id[home_id].market_size, 1.0
             )
             base_viewership = home_venue.capacity if home_venue else 15000
-            projected = int(base_viewership * mult * rivalry_mult * market_mult * random.uniform(0.7, 1.0))
+            projected = int(base_viewership * mult * rivalry_mult * market_mult * _stable_variation(home_id, away_id, d, slot))
 
             games.append(Game(
                 id=str(uuid.uuid4()),
@@ -718,7 +785,16 @@ def _greedy_fallback(matchups, date_slots, team_by_id, venues, rivalry_set, cons
             break
 
         if not assigned:
-            s, (d, slot) = rnd.choice(slot_list)
+            # Last-resort: at minimum avoid venue double-booking
+            fallback_opts = [
+                (s, d, slot) for s, (d, slot) in slot_list if (venue_id, s) not in used_slots
+            ]
+            if not fallback_opts:
+                fallback_opts = [(s, d, slot) for s, (d, slot) in slot_list]
+            s, d, slot = rnd.choice(fallback_opts)
+            used_slots[(venue_id, s)] = True
+            for tid in [home_id, away_id]:
+                team_all_dates.setdefault(tid, set()).add(d)
             home_venue = venues.get(venue_id)
             base_viewership = home_venue.capacity if home_venue else 15000
             games.append(Game(
@@ -729,7 +805,7 @@ def _greedy_fallback(matchups, date_slots, team_by_id, venues, rivalry_set, cons
                 game_date=d,
                 timeslot=slot,
                 is_rivalry=is_rivalry,
-                projected_viewership=int(base_viewership * random.uniform(0.6, 0.9)),
+                projected_viewership=int(base_viewership * _stable_variation(home_id, away_id, d, slot)),
             ))
 
     return games

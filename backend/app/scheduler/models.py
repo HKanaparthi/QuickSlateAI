@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import List, Optional
+from pydantic import BaseModel, Field
+from typing import Any, Dict, List, Optional
 from datetime import date, time
 from enum import Enum
 
@@ -133,3 +133,49 @@ class Schedule(BaseModel):
     total_games: int
     generated_at: str
     solver_status: str
+
+
+class RepairStatus(str, Enum):
+    OPTIMAL = "REPAIR_OPTIMAL"
+    FEASIBLE = "REPAIR_FEASIBLE"
+    TIMEOUT_NO_SOLUTION = "REPAIR_TIMEOUT_NO_SOLUTION"
+    NEIGHBORHOOD_INFEASIBLE = "REPAIR_NEIGHBORHOOD_INFEASIBLE"
+    GLOBALLY_INFEASIBLE_IN_BUDGET = "REPAIR_GLOBALLY_INFEASIBLE_IN_BUDGET"
+    VALIDATION_FAILED = "REPAIR_VALIDATION_FAILED"
+
+
+class GameMove(BaseModel):
+    game_id: str
+    original_date: date
+    original_timeslot: str
+    repaired_date: date
+    repaired_timeslot: str
+    displacement_days: int
+
+
+class RepairRequest(BaseModel):
+    schedule_id: str
+    affected_game_ids: List[str]
+    # Updated constraints to validate against post-repair (e.g., includes new blackouts
+    # that triggered the repair). Defaults to the original schedule's constraints if None.
+    updated_constraints: Optional[ScheduleConstraints] = None
+    neighborhood_size: int = 5
+    max_neighborhood_expansions: int = 3
+    time_limit_seconds: float = Field(default=30.0, gt=0)
+    repair_reason: str = ""
+
+
+class RepairResult(BaseModel):
+    original_schedule_id: str
+    repaired_schedule_id: Optional[str] = None
+    status: RepairStatus
+    moves: List[GameMove] = []
+    neighborhood_expansions_used: int = 0
+    solve_time_seconds: float = 0.0
+    # Reported when status is REPAIR_FEASIBLE: gap between best solution and best
+    # proven lower bound. 0.0 means optimal; None means not available.
+    objective_gap: Optional[float] = None
+    validation_result: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+    # Caller is responsible for persisting this under repaired_schedule_id; None on failure.
+    repaired_schedule: Optional[Schedule] = None

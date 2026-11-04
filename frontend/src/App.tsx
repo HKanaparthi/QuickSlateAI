@@ -7,6 +7,7 @@ import ConflictDashboard from './components/ConflictDashboard';
 import TravelMap from './components/TravelMap';
 import AudienceEstimator from './components/AudienceEstimator';
 import TournamentBracket from './components/TournamentBracket';
+import RepairPanel from './components/RepairPanel';
 import { generateSchedule } from './utils/api';
 
 interface AppState {
@@ -20,6 +21,8 @@ interface AppState {
 export default function App() {
   const [activeSection, setActiveSection] = useState<NavSection>('schedule');
   const [appState, setAppState] = useState<AppState | null>(null);
+  // Preserved pre-repair state; set when user accepts a repair, cleared on restore.
+  const [preRepairState, setPreRepairState] = useState<AppState | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
 
@@ -35,6 +38,7 @@ export default function App() {
         feasibility_analysis: result.feasibility_analysis,
         solver_metrics: result.solver_metrics,
       });
+      setPreRepairState(null);
       setActiveSection('schedule');
     } catch (e: any) {
       setError(
@@ -49,6 +53,23 @@ export default function App() {
   const handleScheduleUpdate = (updatedSchedule: Schedule, newValidation: ValidationResult) => {
     if (!appState) return;
     setAppState(prev => prev ? { ...prev, schedule: updatedSchedule, validation: newValidation } : null);
+  };
+
+  const handleRepairAccepted = (
+    repaired: Schedule,
+    validation: ValidationResult,
+    summary: ScheduleSummary,
+  ) => {
+    if (!appState) return;
+    setPreRepairState(appState);
+    setAppState({ ...appState, schedule: repaired, validation, summary });
+    setActiveSection('schedule');
+  };
+
+  const handleRestoreOriginal = () => {
+    if (!preRepairState) return;
+    setAppState(preRepairState);
+    setPreRepairState(null);
   };
 
   const renderContent = () => {
@@ -106,7 +127,7 @@ export default function App() {
               />
 
               <button
-                onClick={() => setAppState(null)}
+                onClick={() => { setAppState(null); setPreRepairState(null); }}
                 className="btn-secondary text-sm"
               >
                 ← New Schedule
@@ -161,6 +182,30 @@ export default function App() {
               subtitle="Projected viewership based on timeslot, rivalry status, and market factors"
             />
             <AudienceEstimator scheduleId={appState.schedule.id} />
+          </div>
+        );
+
+      case 'repair':
+        return (
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <PageHeader
+                title="Schedule Repair"
+                subtitle="Introduce a venue blackout and let the CP-SAT engine reschedule affected games"
+                inline
+              />
+              {preRepairState && (
+                <span className="text-xs text-warning bg-warning/10 border border-warning/30 px-3 py-1.5 rounded-lg">
+                  Repaired schedule active
+                </span>
+              )}
+            </div>
+            <RepairPanel
+              schedule={appState.schedule}
+              hasOriginal={!!preRepairState}
+              onRepairAccepted={handleRepairAccepted}
+              onRestoreOriginal={handleRestoreOriginal}
+            />
           </div>
         );
 

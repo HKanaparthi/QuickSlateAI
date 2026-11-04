@@ -1,13 +1,17 @@
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
 from datetime import date
 
-from ..scheduler.models import ScheduleConstraints, Schedule, Game, BroadcastContract, VenueBlackout
+from ..scheduler.models import (
+    ScheduleConstraints, Schedule, Game, BroadcastContract, VenueBlackout,
+    RepairRequest as EngineRepairRequest, RepairStatus,
+)
 from ..scheduler.solver import solve_schedule, analyze_feasibility
 from ..scheduler.constraints import validate_schedule
+from ..scheduler.repair import repair_schedule as _repair_schedule_engine, compute_comparison_metrics
 from ..ai.explainer import explain_schedule, explain_single_game
 from ..data import LEAGUES_BY_ID, VENUES_BY_ID, TEAMS_BY_ID, DEFAULT_RIVALRY_PAIRS, CBA_PROFILES, CBA_PROFILES_BY_ID
 
@@ -48,6 +52,16 @@ class UpdateGameRequest(BaseModel):
     game_id: str
     new_date: date
     new_timeslot: str
+
+
+class ScheduleRepairRequest(BaseModel):
+    venue_id: str
+    blackout_start: date
+    blackout_end: date
+    reason: str = ""
+    neighborhood_size: int = 5
+    max_neighborhood_expansions: int = 3
+    time_limit_seconds: float = Field(default=30.0, gt=0)
 
 
 @router.get("/cba-profiles")
@@ -154,6 +168,43 @@ def generate_schedule(req: GenerateRequest):
     feasibility = analyze_feasibility(constraints, league.teams, VENUES_BY_ID)
 
     schedule, solver_metrics = solve_schedule(constraints, league.teams, VENUES_BY_ID)
+
+    # Gate 1 — solver must have found a feasible/optimal solution.
+    if schedule.solver_status in ("TIMEOUT_FALLBACK", "INFEASIBLE"):
+        reasons = solver_metrics.get("infeasibility_reasons") or []
+        hint = (
+            "; ".join(reasons)
+            if reasons
+            else "Try extending the season, reducing min_rest_days, or relaxing constraints."
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=f"Schedule generation failed ({schedule.solver_status}). {hint}",
+        )
+
+    # Gate 2 — independent validation BEFORE the schedule enters the store.
+    # This catches any residual hard violations the solver may have missed
+    # (e.g., from the greedy post-solve repair pass).
+    validation = validate_schedule(schedule.games, constraints, league.teams)
+    red_violations = [v for v in validation["violations"] if v.get("severity") == "RED"]
+    if red_violations:
+        type_counts: Dict[str, int] = {}
+        for v in red_violations:
+            type_counts[v["type"]] = type_counts.get(v["type"], 0) + 1
+        desc = ", ".join(
+            f"{cnt} {t.replace('_', ' ')}"
+            for t, cnt in sorted(type_counts.items())
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Generated schedule has {len(red_violations)} hard constraint "
+                f"violation(s) ({desc}). "
+                "The solver may need more time or relaxed constraints."
+            ),
+        )
+
+    # Schedule passed all gates — safe to store.
     _schedule_store[schedule.id] = schedule
 
     explanations = explain_schedule(schedule, {t.id: t for t in league.teams})
@@ -164,10 +215,9 @@ def generate_schedule(req: GenerateRequest):
     _explanation_store[schedule.id] = explanations
     _schedule_store[schedule.id] = schedule
 
-    validation = validate_schedule(schedule.games, constraints, league.teams)
     summary = _build_summary(schedule, league.teams, validation)
 
-    # Augment solver metrics with post-validation constraint satisfaction stats
+    # Augment solver metrics with post-validation stats
     solver_metrics["venue_conflicts"] = sum(1 for v in validation["violations"] if v["type"] == "venue_conflict")
     solver_metrics["rest_violations"] = sum(1 for v in validation["violations"] if v["type"] == "rest_days")
     solver_metrics["back_to_back_away_count"] = sum(1 for v in validation["violations"] if v["type"] == "back_to_back_away")
@@ -183,6 +233,17 @@ def generate_schedule(req: GenerateRequest):
         "feasibility_analysis": feasibility,
         "solver_metrics": solver_metrics,
     }
+
+
+@router.get("/compare/{original_id}/{repaired_id}")
+def compare_schedules(original_id: str, repaired_id: str):
+    original = _schedule_store.get(original_id)
+    if not original:
+        raise HTTPException(status_code=404, detail=f"Schedule '{original_id}' not found")
+    repaired = _schedule_store.get(repaired_id)
+    if not repaired:
+        raise HTTPException(status_code=404, detail=f"Schedule '{repaired_id}' not found")
+    return compute_comparison_metrics(original, repaired)
 
 
 @router.get("/{schedule_id}")
@@ -227,6 +288,85 @@ def update_game(schedule_id: str, req: UpdateGameRequest):
     return {
         "updated_game": game.model_dump(),
         "validation": validation,
+    }
+
+
+@router.post("/{schedule_id}/repair")
+def repair_schedule_endpoint(schedule_id: str, req: ScheduleRepairRequest):
+    schedule = _schedule_store.get(schedule_id)
+    if not schedule:
+        raise HTTPException(status_code=404, detail=f"Schedule '{schedule_id}' not found")
+
+    if req.venue_id not in VENUES_BY_ID:
+        raise HTTPException(status_code=400, detail=f"Venue '{req.venue_id}' not found")
+
+    if req.blackout_start > req.blackout_end:
+        raise HTTPException(
+            status_code=400, detail="blackout_start must be on or before blackout_end"
+        )
+
+    affected_game_ids = [
+        g.id for g in schedule.games
+        if g.venue_id == req.venue_id
+        and req.blackout_start <= g.game_date <= req.blackout_end
+    ]
+
+    if not affected_game_ids:
+        return {
+            "status": "NO_GAMES_AFFECTED",
+            "message": (
+                f"No games at venue '{req.venue_id}' between "
+                f"{req.blackout_start} and {req.blackout_end}. "
+                "Original schedule is unaffected."
+            ),
+            "original_schedule_id": schedule_id,
+            "repaired_schedule_id": None,
+            "moves": [],
+        }
+
+    new_blackout = VenueBlackout(
+        venue_id=req.venue_id,
+        start_date=req.blackout_start,
+        end_date=req.blackout_end,
+        reason=req.reason,
+    )
+    updated_constraints = schedule.constraints.model_copy(
+        update={"venue_blackouts": schedule.constraints.venue_blackouts + [new_blackout]}
+    )
+
+    league = LEAGUES_BY_ID.get(schedule.league_id)
+    teams = league.teams if league else []
+
+    engine_req = EngineRepairRequest(
+        schedule_id=schedule_id,
+        affected_game_ids=affected_game_ids,
+        updated_constraints=updated_constraints,
+        neighborhood_size=req.neighborhood_size,
+        max_neighborhood_expansions=req.max_neighborhood_expansions,
+        time_limit_seconds=req.time_limit_seconds,
+        repair_reason=req.reason,
+    )
+
+    result = _repair_schedule_engine(engine_req, schedule, teams, VENUES_BY_ID)
+
+    if (
+        result.status in (RepairStatus.OPTIMAL, RepairStatus.FEASIBLE)
+        and result.repaired_schedule is not None
+        and result.repaired_schedule_id is not None
+    ):
+        _schedule_store[result.repaired_schedule_id] = result.repaired_schedule
+
+    return {
+        "original_schedule_id": schedule_id,
+        "repaired_schedule_id": result.repaired_schedule_id,
+        "status": result.status,
+        "moves": [m.model_dump() for m in result.moves],
+        "neighborhood_expansions_used": result.neighborhood_expansions_used,
+        "solve_time_seconds": result.solve_time_seconds,
+        "objective_gap": result.objective_gap,
+        "validation_result": result.validation_result,
+        "affected_game_ids": affected_game_ids,
+        "error_message": result.error_message,
     }
 
 
