@@ -11,6 +11,7 @@ const NAV_ITEMS: Array<{ id: NavSection; label: string; icon: string; requiresSc
   { id: 'conflicts', label: 'Conflict Dashboard', icon: '⚠️', requiresSchedule: true },
   { id: 'travel', label: 'Travel Optimizer', icon: '✈️', requiresSchedule: true },
   { id: 'audience', label: 'Audience Estimator', icon: '📊', requiresSchedule: true },
+  { id: 'repair', label: 'Schedule Repair', icon: '🔧', requiresSchedule: true },
   { id: 'tournament', label: 'Tournament Bracket', icon: '🏆' },
 ];
 

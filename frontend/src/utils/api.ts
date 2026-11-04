@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { TravelAnalysis, AudienceAnalysis, TournamentBracket, BroadcastContract, VenueBlackout, CBAProfile } from '../types';
+import type { TravelAnalysis, AudienceAnalysis, TournamentBracket, BroadcastContract, VenueBlackout, CBAProfile, RepairApiResponse, ComparisonMetrics } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -75,6 +75,30 @@ export async function getTravelAnalysis(scheduleId: string): Promise<TravelAnaly
 
 export async function getAudienceAnalysis(scheduleId: string): Promise<AudienceAnalysis> {
   const res = await api.get(`/audience/${scheduleId}`);
+  return res.data;
+}
+
+export async function repairSchedule(
+  scheduleId: string,
+  payload: {
+    venue_id: string;
+    blackout_start: string;
+    blackout_end: string;
+    reason?: string;
+    neighborhood_size?: number;
+    max_neighborhood_expansions?: number;
+    time_limit_seconds?: number;
+  }
+): Promise<RepairApiResponse> {
+  const res = await api.post(`/schedule/${scheduleId}/repair`, payload);
+  return res.data;
+}
+
+export async function compareSchedules(
+  originalId: string,
+  repairedId: string
+): Promise<ComparisonMetrics> {
+  const res = await api.get(`/schedule/compare/${originalId}/${repairedId}`);
   return res.data;
 }
 

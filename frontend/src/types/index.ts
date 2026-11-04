@@ -260,7 +260,54 @@ export interface TournamentBracket {
   champion: string | null;
 }
 
-export type NavSection = 'schedule' | 'conflicts' | 'travel' | 'audience' | 'tournament';
+export type NavSection = 'schedule' | 'conflicts' | 'travel' | 'audience' | 'tournament' | 'repair';
+
+export interface GameMove {
+  game_id: string;
+  original_date: string;
+  original_timeslot: string;
+  repaired_date: string;
+  repaired_timeslot: string;
+  displacement_days: number;
+}
+
+export interface RepairApiResponse {
+  original_schedule_id: string;
+  repaired_schedule_id: string | null;
+  status: string;
+  moves: GameMove[];
+  neighborhood_expansions_used?: number;
+  solve_time_seconds?: number;
+  objective_gap?: number | null;
+  validation_result?: ValidationResult | null;
+  affected_game_ids?: string[];
+  error_message?: string | null;
+  message?: string;
+}
+
+export interface ComparisonMovedGame {
+  game_id: string;
+  home_team_id: string;
+  away_team_id: string;
+  original_date: string;
+  original_timeslot: string;
+  repaired_date: string;
+  repaired_timeslot: string;
+  displacement_days: number;
+  original_projected_viewership: number | null;
+  repaired_projected_viewership: number | null;
+}
+
+export interface ComparisonMetrics {
+  total_games: number;
+  games_moved: number;
+  games_unchanged: number;
+  total_displacement_days: number;
+  original_total_quality: number;
+  repaired_total_quality: number;
+  quality_delta: number;
+  moved_games: ComparisonMovedGame[];
+}
 
 export interface CBAProfile {
   id: string;
